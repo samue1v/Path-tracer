@@ -1,0 +1,17 @@
+# External dependencies
+libs/*
+
+# Obj mesh files
+meshFiles/*
+
+# Build folder
+build/*
+
+# Clangd cache
+.cache/*
+
+# Clangd ignore file
+.ignore
+
+# IMGUI init file
+imgui.ini
