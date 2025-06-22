@@ -9,7 +9,7 @@ GLFW_backend::GLFW_backend() {
   glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
   glfwWindowHint(GLFW_FLOATING, GLFW_TRUE);
   glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
-  window = glfwCreateWindow(1024, 768, "Vulkan", nullptr, nullptr);
+  window = glfwCreateWindow(640, 640, "Vulkan", nullptr, nullptr);
   glfwSetFramebufferSizeCallback(window, framebufferResizeCallback);
   glfwSwapInterval(0);
 

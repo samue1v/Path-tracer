@@ -1,11 +1,5 @@
 #include "swapchain.hpp"
-#include <iostream>
 
-// #ifdef NDEBUG
-//  bool enableValidationLayers = false;
-// #else
-//  bool enableValidationLayers = true;
-// #endif
 
 void Swapchain::create(vk::Device logicalDevice,
                        vk::PhysicalDevice physicalDevice,
@@ -59,7 +53,7 @@ void Swapchain::create(vk::Device logicalDevice,
   */
   vk::SwapchainCreateInfoKHR createInfo = vk::SwapchainCreateInfoKHR(
       vk::SwapchainCreateFlagsKHR(), surface, imageCount, format.format,
-      format.colorSpace, extent, 1, vk::ImageUsageFlagBits::eColorAttachment);
+      format.colorSpace, extent, 1, vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eTransferDst);
 
   createInfo.preTransform = capabilities.currentTransform;
   createInfo.presentMode = presentMode;
@@ -89,8 +83,7 @@ void Swapchain::build(vk::RenderPass renderPass) {
 }
 
 void Swapchain::cleanUp() {
-  
-  depthAttachment.cleanUp();
+
 
   while (chainGarbageQueue.size() > 0) {
     chainGarbageQueue.back()(logicalDevice);
@@ -130,8 +123,9 @@ vk::SurfaceFormatKHR
 Swapchain::chooseSurfaceFormat(std::vector<vk::SurfaceFormatKHR> formats) {
   for (vk::SurfaceFormatKHR format : formats) {
     if (enableValidationLayers && chain == vk::SwapchainKHR{}) {
-      std::cout << vk::to_string(format.format) << " | "
-                << vk::to_string(format.colorSpace) << "\n";
+      Logger::log(Logger::LogLevel::DEBUG,
+                  "Surface Format: " + vk::to_string(format.format) + " | " +
+                      vk::to_string(format.colorSpace));
     }
     if (format.format == vk::Format::eB8G8R8A8Unorm &&
         format.colorSpace == vk::ColorSpaceKHR::eSrgbNonlinear) {
@@ -142,16 +136,13 @@ Swapchain::chooseSurfaceFormat(std::vector<vk::SurfaceFormatKHR> formats) {
   return formats[0];
 }
 
-void Swapchain::createAttachment(VmaAllocator & allocator){
-  depthAttachment = FB_Attachment(logicalDevice,allocator);
-}
 
 void Swapchain::createFrameBuffers(vk::RenderPass renderPass) {
   frameBuffers.resize(imageCount);
 
   for (size_t i = 0; i < imageCount; i++) {
-    std::array<vk::ImageView, 2> attachments = {frames[i].imageView,
-                                              depthAttachment.frame.imageView};
+    std::array<vk::ImageView, 1> attachments = {
+        frames[i].imageView};
 
     vk::FramebufferCreateInfo framebufferInfo{};
     framebufferInfo.sType = vk::StructureType::
@@ -176,7 +167,6 @@ void Swapchain::createFrameBuffers(vk::RenderPass renderPass) {
         for (size_t i = 0; i < frames.size(); i++) {
           device.destroyFramebuffer(frameBuffers[i]);
           device.destroyImageView(frames[i].imageView);
-          // device.destroyImage(frames[i].image);
         }
         frames.clear();
       });

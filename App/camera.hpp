@@ -1,10 +1,6 @@
 #ifndef CAMERA_HPP
 #define CAMERA_HPP
 
-#include "shared_structs.hpp"
-#include <array>
-#include <atomic>
-#include <chrono>
 #include <glm/ext/matrix_clip_space.hpp>
 #include <glm/ext/matrix_projection.hpp>
 #include <glm/ext/matrix_transform.hpp>
@@ -28,7 +24,6 @@ public:
   void update();
 
 public:
-  Shared::CameraMatrices vp;
 
   glm::vec3 at;
   glm::vec3 pos;

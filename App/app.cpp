@@ -40,8 +40,7 @@ void spawn_render_thread(GLFWwindow *window, VulkanRender *engine,
   delete engine;
 }
 
-App::App(GLFWwindow *window)
-    : window(window){
+App::App(GLFWwindow *window) : window(window), logger(Logger::getInstance()) {
 
   engine = new VulkanRender(window);
   engine->renderCommands = &renderCommands;
@@ -52,7 +51,7 @@ App::App(GLFWwindow *window)
 
 void App::run() {
   if (enableValidationLayers) {
-    std::cout << "App is runnig!\n";
+    Logger::log(Logger::LogLevel::INFO, "App is running!");
   }
 
   std::atomic<bool> done = false;
@@ -116,9 +115,7 @@ void App::cursor_position_callback(GLFWwindow *window, double xpos,
   auto app = static_cast<App *>(glfwGetWindowUserPointer(window));
 }
 
-void App::uploadMesh(std::string name) {
-
-}
+void App::uploadMesh(std::string name) {}
 
 void App::updateState() {
   std::function<void()> command;

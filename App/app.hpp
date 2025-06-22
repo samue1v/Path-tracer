@@ -9,6 +9,7 @@
 #include <iostream>
 #include <mutex>
 #include <thread>
+#include "Logger.hpp"
 
 
 /**
@@ -72,6 +73,8 @@ private:
 
   std::queue<std::function<void()>> * mainCommands;
   std::mutex * mainQueueMutex;
+
+  Logger & logger;
 
 public:
 

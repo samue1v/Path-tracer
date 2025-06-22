@@ -33,5 +33,5 @@ void Camera::updateView() {
 }
 
 void Camera::updateProj() {
-  vp.proj = glm::perspective(glm::radians(fov), aspect, near, far);
+  //vp.proj = glm::perspective(glm::radians(fov), aspect, near, far);
 }

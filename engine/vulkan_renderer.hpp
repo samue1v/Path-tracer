@@ -6,36 +6,39 @@
 #include <deque>
 #include <functional>
 #define VULKAN_HPP_NO_EXCEPTIONS
-#include <unordered_map>
 #include <vk_mem_alloc.h>
 #include <vulkan/vulkan.hpp>
 
-#include <chrono>
-#include <filesystem>
-#include <fstream>
 #include <glm/matrix.hpp>
-#include <iostream>
 #include <mutex>
-#include <optional>
 #include <queue>
-#include <random>
-#include <thread>
 #include <vector>
 
-#include "allocator.hpp"
+#include "Buffer.hpp"
+#include "Logger.hpp"
+#include "ResourceImage.hpp"
 #include "frame.hpp"
 #include "objLoader.hpp"
-#include "pipelineManager.hpp"
-#include "shared_structs.hpp"
 #include "simpleMesh.hpp"
 #include "swapchain.hpp"
+#include <vk_mem_alloc.h>
 
 #define ENGINE_VERSION VK_MAKE_API_VERSION(0, 1, 0, 0)
 class App;
 
-struct MV {
+struct uniform {
   alignas(16) glm::mat4 view;
   alignas(16) glm::mat4 proj;
+};
+
+struct alignas(16) hitData {
+  glm::vec4 wo;
+  glm::vec4 wi;
+  glm::vec4 hit;
+  glm::vec4 normal;
+  glm::vec4 color;
+  int depth;
+  int pad[3];
 };
 
 /**
@@ -43,6 +46,49 @@ struct MV {
  */
 class VulkanRender {
 public:
+  // Resources for the graphics part of the example
+  struct Graphics {
+
+    vk::DescriptorSetLayout descriptorSetLayout{VK_NULL_HANDLE};
+    vk::DescriptorSet descriptorSetPreCompute{VK_NULL_HANDLE};
+
+    vk::DescriptorSet descriptorSetPostCompute{VK_NULL_HANDLE};
+
+    vk::Pipeline pipeline{VK_NULL_HANDLE};
+    vk::PipelineLayout pipelineLayout{VK_NULL_HANDLE};
+    vk::Semaphore semaphore{VK_NULL_HANDLE};
+    vk::Queue queue{VK_NULL_HANDLE};
+    std::vector<vk::CommandBuffer> commandBuffer{};
+
+    vk::CommandPool commandPool{VK_NULL_HANDLE};
+
+  } graphics;
+
+  // Resources for the compute part of the example
+  struct Compute {
+    vk::Queue queue{VK_NULL_HANDLE};
+
+    vk::CommandPool commandPool{VK_NULL_HANDLE};
+
+    vk::CommandBuffer commandBuffer{VK_NULL_HANDLE};
+
+    vk::Semaphore semaphore{VK_NULL_HANDLE};
+
+    vk::DescriptorSetLayout descriptorSetLayout{VK_NULL_HANDLE};
+
+    std::vector<vk::DescriptorSet> descriptorSet;
+    vk::PipelineLayout pipelineLayout{VK_NULL_HANDLE};
+    vk::DescriptorPool descriptorPool{VK_NULL_HANDLE};
+    std::vector<vk::Pipeline> pipelines{};
+    int32_t pipelineIndex{0};
+
+    Buffer uniformBuffer;
+    Buffer storageBuffer;
+
+    ResourceImage storageImg;
+
+    static constexpr uint32_t rays_per_pixel = 1;
+  } compute;
   /**
    * @brief Construct new Engine object
    *
@@ -79,9 +125,14 @@ public:
   void waitIdle();
 
   /**
-   * @brief Switch frameBufferResize 0-1
+   * @brief Create image resources
    */
-  void switchResized();
+  void createImageResources();
+
+  /**
+   * @brief Create buffer resources
+   */
+  void createBufferResources();
 
   /**
    * @brief Sets current FPS
@@ -97,11 +148,6 @@ public:
    * @brief Update MVP matrix
    */
   void updateMVP(glm::vec3 pos, glm::vec3 at);
-
-  /**
-   * @brief Uploads mesh to hull
-   */
-  void uploadHullDraw(std::string meshName);
 
 public:
   std::queue<std::function<void()>> *renderCommands;
@@ -190,6 +236,16 @@ private:
   void createCommandBuffers();
 
   /**
+   * @brief Create descriptors sets layouts
+   */
+  void createDescriptorSetLayout();
+
+  /**
+   * @brief Create pipeline
+   */
+  void createPipeline();
+
+  /**
    * @brief Record draw command in the command buffer
    */
   void recordCommandBuffer(vk::CommandBuffer commandBuffer,
@@ -206,19 +262,21 @@ private:
   void createSyncObjects();
 
   /**
-   * @brief Recreates the swap chain
+   * @brief Create descriptor sets
    */
-  void recreateSwapChain();
-
   void createDescriptorSets();
 
-  void createDepthResources();
+  /**
+   * @brief Create descriptor pool
+   */
+  void createDescriptorPool();
 
+  /**
+   * @brief Find
+   */
   vk::Format findSupportedFormat(const std::vector<vk::Format> &candidates,
                                  vk::ImageTiling tiling,
                                  vk::FormatFeatureFlagBits features);
-
-  vk::Format findDepthFormat();
 
   bool hasStencilComponent(vk::Format format);
 
@@ -246,16 +304,6 @@ private:
   vk::Device logicalDevice;
 
   /**
-   * @brief Graphics queue
-   */
-  vk::Queue graphicsQueue;
-
-  /**
-   * @brief Presentation queue
-   */
-  vk::Queue presentQueue;
-
-  /**
    * @brief Surface
    */
   vk::SurfaceKHR surface;
@@ -269,21 +317,6 @@ private:
    * @brief Current render pass
    */
   vk::RenderPass renderPass;
-
-  /**
-   * @brief Command Pool
-   */
-  vk::CommandPool cmdPool;
-
-  /**
-   * @brief Vector of descriptor sets
-   */
-  std::vector<vk::DescriptorSet> descriptorSets;
-
-  /**
-   * @brief Command Buffers
-   */
-  std::vector<vk::CommandBuffer> cmdBuffers;
 
   /**
    * @brief Semaphore that signals when swapchain image is avaliable
@@ -333,17 +366,12 @@ private:
   /**
    * @brief Wrapper for vma allocation.
    */
-  Allocator allocatorWrapper;
+  VmaAllocator allocator;
 
   /**
    * @brief Loader for obj files
    */
   OBJLoader objLoader;
-
-  /**
-   * @brief Pipeline Manager
-   */
-  PipelineManager pipeManager;
 
   /**
    * @brief Max frames in flight
@@ -360,7 +388,10 @@ private:
    */
   uint32_t currentFrame;
 
-  MV testMV{};
+  /**
+   * @brief Scene ViewProj matrix
+   */
+  uniform proj_view_uniforms;
 
   // IMGUI stuff
 private:
@@ -371,7 +402,6 @@ private:
   void showPerformanceMenu();
 
   void showMenu();
-
 
   // Shared stuff
 public:

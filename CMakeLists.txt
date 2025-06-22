@@ -42,17 +42,15 @@ set(ENGINE_SOURCES
    engine/frame.cpp
    engine/swapchain.hpp
    engine/swapchain.cpp
-   engine/allocator.hpp
-   engine/allocator.cpp
-   engine/FB_attachment.hpp
-   engine/FB_attachment.cpp
+   engine/ResourceImage.hpp
+   engine/ResourceImage.cpp
+   engine/Buffer.hpp
+   engine/Buffer.cpp
   )
 
 set(PIPELINE_SOURCES
    pipelines/pipeline.hpp
    pipelines/pipeline.cpp
-   pipelines/pipelineManager.hpp
-   pipelines/pipelineManager.cpp
    )
 
 
@@ -72,14 +70,12 @@ set(APP_SOURCES
 
 set(CONFIG_SOURCES
    config/config.hpp
+   config/Logger.hpp
+   config/Logger.cpp
    )
 
-set(SHARED_SOURCES
-   shared/shared_structs.hpp
-   )
 
-
-add_executable(engine main.cpp ${BACKEND_SOURCES} ${ENGINE_SOURCES} ${PIPELINE_SOURCES} ${TARGET_SOURCES} ${APP_SOURCES} ${CONFIG_SOURCES} ${IMGUI_SOURCES} ${SHARED_SOURCES} ) 
+add_executable(engine main.cpp ${BACKEND_SOURCES} ${ENGINE_SOURCES} ${PIPELINE_SOURCES} ${TARGET_SOURCES} ${APP_SOURCES} ${CONFIG_SOURCES} ${IMGUI_SOURCES}  ) 
 
 target_include_directories(engine PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/backend 
                                           ${CMAKE_CURRENT_SOURCE_DIR}/engine 
@@ -87,7 +83,6 @@ target_include_directories(engine PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/backend
                                           ${CMAKE_CURRENT_SOURCE_DIR}/targets
                                           ${CMAKE_CURRENT_SOURCE_DIR}/config
                                           ${CMAKE_CURRENT_SOURCE_DIR}/App
-                                          ${CMAKE_CURRENT_SOURCE_DIR}/shared
                                           ${CMAKE_CURRENT_SOURCE_DIR}/libs/imgui
                                           ${Vulkan_INCLUDE_DIRS}
                                           )

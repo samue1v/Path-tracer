@@ -3,7 +3,7 @@
 #define VULKAN_HPP_NO_EXCEPTIONS
 #include "../config/config.hpp"
 #include "frame.hpp"
-#include "FB_attachment.hpp"
+#include "Logger.hpp"
 #include <deque>
 #include <functional>
 #include <vulkan/vulkan.hpp>
@@ -32,7 +32,6 @@ public:
    */
   void createFrameBuffers(vk::RenderPass renderPass);
 
-  void createAttachment(VmaAllocator & allocator);
 
   /**
    * @brief Cleans the swap chain for recreation
@@ -81,7 +80,6 @@ public:
   vk::Device logicalDevice;
   
 
-  FB_Attachment depthAttachment;
 private:
   /**
    * @brief Choose an extent, working within the given constraints
