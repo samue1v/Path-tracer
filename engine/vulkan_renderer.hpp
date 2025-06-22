@@ -21,6 +21,8 @@
 #include "objLoader.hpp"
 #include "simpleMesh.hpp"
 #include "swapchain.hpp"
+
+#include "pipeline.hpp"
 #include <vk_mem_alloc.h>
 
 #define ENGINE_VERSION VK_MAKE_API_VERSION(0, 1, 0, 0)
@@ -77,9 +79,10 @@ public:
     vk::DescriptorSetLayout descriptorSetLayout{VK_NULL_HANDLE};
 
     std::vector<vk::DescriptorSet> descriptorSet;
-    vk::PipelineLayout pipelineLayout{VK_NULL_HANDLE};
+
     vk::DescriptorPool descriptorPool{VK_NULL_HANDLE};
-    std::vector<vk::Pipeline> pipelines{};
+
+    Pipeline pipeline;
     int32_t pipelineIndex{0};
 
     Buffer uniformBuffer;

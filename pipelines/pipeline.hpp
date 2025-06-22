@@ -9,29 +9,53 @@
 class Pipeline {
 public:
   /**
-   * @brief Initializes the pipeline workflow
+   * @brief Default constructor
    */
-  virtual void createPipeline(
-      vk::Device device, const char *vertShaderPath, const char *fragShaderPath,
-      vk::RenderPass renderPass, vk::DescriptorSetLayout descriptorLayout,
-      std::deque<std::function<void(vk::Device)>> &deletionQueue) = 0;
-  virtual ~Pipeline() = default;
+  Pipeline() = default;
 
-protected:
+  /**
+   * @brief Initializes graphics pipeline workflow
+   */
+  void
+  createPipeline(vk::Device device, const char *vertShaderPath,
+                 const char *fragShaderPath, vk::RenderPass renderPass,
+                 vk::DescriptorSetLayout descriptorLayout,
+                 std::deque<std::function<void(vk::Device)>> &deletionQueue);
+
+  /**
+   * @brief Initializes compute pipeline workflow
+   */
+  void
+  createPipeline(vk::Device device, const char *shaderPath,
+                 vk::DescriptorSetLayout descriptorLayout,
+                 std::deque<std::function<void(vk::Device)>> &deletionQueue);
+
+  ~Pipeline() = default;
+
+private:
   /**
    * @brief Builds the pipeline
    * @param device Logical device
    * @param swapchainFormat the swapchain image format
    * @param vertShader compiled SPV vertex shader
-   * @param fragShader compiled SPV fragment shader
-   * @param vertexType pointer to unique vertex type
    */
 
-  virtual void
+  void
   buildPipeline(vk::Device device, const char *vertShaderPath,
                 const char *fragShaderPath, vk::RenderPass renderPass,
                 vk::DescriptorSetLayout descriptorLayout,
-                std::deque<std::function<void(vk::Device)>> &deletionQueue) = 0;
+                std::deque<std::function<void(vk::Device)>> &deletionQueue);
+
+  /**
+   * @brief Builds the pipeline
+   * @param device Logical device
+   * @param swapchainFormat the swapchain image format
+   * @param vertShader compiled SPV vertex shader
+   */
+  void
+  buildPipeline(vk::Device device, const char *shaderPath,
+                vk::DescriptorSetLayout descriptorLayout,
+                std::deque<std::function<void(vk::Device)>> &deletionQueue);
 
   /**
    * @brief Reads the content of the shader file
@@ -61,10 +85,6 @@ public:
    */
   vk::PipelineLayout layout;
 
-  /**
-   * @brief Pipeline name
-   */
-  std::string name;
 };
 
 #endif

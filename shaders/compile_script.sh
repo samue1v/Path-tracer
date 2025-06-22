@@ -2,7 +2,7 @@
 
 mkdir -p compiled
 
-for shader in *.vert *.frag; do
+for shader in *.vert *.frag *.comp; do
     if [[ -f "$shader" ]]; then
         output="compiled/$shader.spv"
         echo "Compiling $shader -> $output"

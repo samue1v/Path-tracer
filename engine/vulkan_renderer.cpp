@@ -602,7 +602,8 @@ void VulkanRender::createLogicalDevice() {
   VkDeviceQueueCreateInfo queueCreateGraphicHandle = queueCreateInfoGraphic;
   VkDeviceQueueCreateInfo queueCreateComputeHandle = queueCreateInfoCompute;
 
-  std::array<VkDeviceQueueCreateInfo, 2> queueInfos({queueCreateGraphicHandle,queueCreateComputeHandle});
+  std::array<VkDeviceQueueCreateInfo, 2> queueInfos(
+      {queueCreateGraphicHandle, queueCreateComputeHandle});
 
   /*
    * Device features must be requested before the device is abstracted,
@@ -659,60 +660,40 @@ void VulkanRender::createSwapChain() {
 void VulkanRender::buildRenderPass() {
   vk::AttachmentDescription colorAttachment{};
   colorAttachment.format = chain.format.format;
-  colorAttachment.samples =
-      vk::SampleCountFlagBits::e1; // VK_SAMPLE_COUNT_1_BIT;
-  colorAttachment.loadOp =
-      vk::AttachmentLoadOp::eClear; // VK_ATTACHMENT_LOAD_OP_CLEAR;
-  colorAttachment.storeOp =
-      vk::AttachmentStoreOp::eStore; // VK_ATTACHMENT_STORE_OP_STORE;
-  colorAttachment.stencilLoadOp =
-      vk::AttachmentLoadOp::eDontCare; // VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-  colorAttachment.stencilStoreOp =
-      vk::AttachmentStoreOp::eDontCare; // VK_ATTACHMENT_STORE_OP_DONT_CARE;
-  colorAttachment.initialLayout =
-      vk::ImageLayout::eUndefined; // VK_IMAGE_LAYOUT_UNDEFINED;
-  colorAttachment.finalLayout =
-      vk::ImageLayout::ePresentSrcKHR; // VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+  colorAttachment.samples = vk::SampleCountFlagBits::e1;
+  colorAttachment.loadOp = vk::AttachmentLoadOp::eClear;
+  colorAttachment.storeOp = vk::AttachmentStoreOp::eStore;
+  colorAttachment.stencilLoadOp = vk::AttachmentLoadOp::eDontCare;
+  colorAttachment.stencilStoreOp = vk::AttachmentStoreOp::eDontCare;
+  colorAttachment.initialLayout = vk::ImageLayout::eUndefined;
+  colorAttachment.finalLayout = vk::ImageLayout::ePresentSrcKHR;
 
   vk::AttachmentReference colorAttachmentRef{};
   colorAttachmentRef.attachment = 0;
-  colorAttachmentRef.layout = vk::ImageLayout::
-      eColorAttachmentOptimal; // VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-                               //
+  colorAttachmentRef.layout = vk::ImageLayout::eColorAttachmentOptimal;
 
   vk::SubpassDescription subpass{};
-  subpass.pipelineBindPoint =
-      vk::PipelineBindPoint::eGraphics; // VK_PIPELINE_BIND_POINT_GRAPHICS;
+  subpass.pipelineBindPoint = vk::PipelineBindPoint::eGraphics;
   subpass.colorAttachmentCount = 1;
   subpass.pColorAttachments = &colorAttachmentRef;
-  // subpass.pDepthStencilAttachment = &depthAttachmentRef;
 
-  // VkSubpassDependency dependency{};
   vk::SubpassDependency dependency{};
   dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
   dependency.dstSubpass = 0;
-  dependency.srcStageMask =
-      vk::PipelineStageFlagBits::eColorAttachmentOutput |
-      vk::PipelineStageFlagBits::
-          eEarlyFragmentTests; // eLateFragmentTests; //
-                               // VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-  dependency.srcAccessMask =
-      vk::AccessFlagBits::eNone; // eDepthStencilAttachmentWrite; //
-                                 // vk::AccessFlagBits::eNone;
-  dependency.dstStageMask =
-      vk::PipelineStageFlagBits::eColorAttachmentOutput |
-      vk::PipelineStageFlagBits::
-          eEarlyFragmentTests; // VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-  dependency.dstAccessMask =
-      vk::AccessFlagBits::eColorAttachmentWrite |
-      vk::AccessFlagBits::
-          eDepthStencilAttachmentWrite; // VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-                                        //
+  dependency.srcStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput |
+                            vk::PipelineStageFlagBits::eEarlyFragmentTests;
+
+  dependency.srcAccessMask = vk::AccessFlagBits::eNone;
+
+  dependency.dstStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput |
+                            vk::PipelineStageFlagBits::eEarlyFragmentTests;
+  dependency.dstAccessMask = vk::AccessFlagBits::eColorAttachmentWrite |
+                             vk::AccessFlagBits::eDepthStencilAttachmentWrite;
+
   std::array<vk::AttachmentDescription, 1> attachments = {colorAttachment};
 
   vk::RenderPassCreateInfo renderPassInfo{};
-  renderPassInfo.sType = vk::StructureType::
-      eRenderPassCreateInfo; // VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+  renderPassInfo.sType = vk::StructureType::eRenderPassCreateInfo;
   renderPassInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
   renderPassInfo.pAttachments = attachments.data();
   renderPassInfo.subpassCount = 1;
@@ -737,10 +718,8 @@ void VulkanRender::createCommandPool() {
       findQueueFamilyIndex(vk::QueueFlagBits::eGraphics);
 
   vk::CommandPoolCreateInfo poolInfo{};
-  poolInfo.sType = vk::StructureType::
-      eCommandPoolCreateInfo; // VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-  poolInfo.flags = vk::CommandPoolCreateFlagBits::
-      eResetCommandBuffer; // VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+  poolInfo.sType = vk::StructureType::eCommandPoolCreateInfo;
+  poolInfo.flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer;
   poolInfo.queueFamilyIndex = graphicsFamilyIdx;
 
   auto res = logicalDevice.createCommandPool(poolInfo);
@@ -933,6 +912,9 @@ void VulkanRender::createPipeline() {
   layoutCreateInfo.sType = vk::StructureType::ePipelineLayoutCreateInfo;
   layoutCreateInfo.setLayoutCount = 1;
   layoutCreateInfo.pSetLayouts = &compute.descriptorSetLayout;
+  compute.pipeline.createPipeline(logicalDevice, "pathTracer.comp.spv",
+                                  compute.descriptorSetLayout,
+                                  deviceGlobalGarbageQueue);
 }
 
 void VulkanRender::createDescriptorPool() {
@@ -988,7 +970,6 @@ bool VulkanRender::hasStencilComponent(vk::Format format) {
 }
 
 void VulkanRender::initIMGUI() {
-  // Create descriptor pool for ImGui
   std::array<vk::DescriptorPoolSize, 11> poolSizes = {
       vk::DescriptorPoolSize(vk::DescriptorType::eSampler, 1000),
       vk::DescriptorPoolSize(vk::DescriptorType::eCombinedImageSampler, 1000),
@@ -1003,8 +984,7 @@ void VulkanRender::initIMGUI() {
       vk::DescriptorPoolSize(vk::DescriptorType::eInputAttachment, 1000)};
 
   vk::DescriptorPoolCreateInfo poolInfo(
-      vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet,
-      1000, // maxSets
+      vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet, 1000,
       static_cast<uint32_t>(poolSizes.size()), poolSizes.data());
 
   auto resDP = logicalDevice.createDescriptorPool(poolInfo);
@@ -1013,16 +993,13 @@ void VulkanRender::initIMGUI() {
   }
   imguiDescriptorPool = resDP.value;
 
-  // Initialize ImGui context
   IMGUI_CHECKVERSION();
   ImGui::CreateContext();
   ImGuiIO &io = ImGui::GetIO();
   io.IniFilename = nullptr;
 
-  // Initialize GLFW backend
   ImGui_ImplGlfw_InitForVulkan(window, true);
 
-  // Initialize Vulkan backend
   ImGui_ImplVulkan_InitInfo init_info = {};
   init_info.Instance = static_cast<VkInstance>(instance);
   init_info.PhysicalDevice = static_cast<VkPhysicalDevice>(physicalDevice);

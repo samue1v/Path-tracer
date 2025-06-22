@@ -1,0 +1,27 @@
+#version 450
+struct HitData {
+  vec4 wo;
+  vec4 wi;
+  vec4 hit;
+  vec4 normal;
+  vec4 color;
+  int depth;
+};
+
+layout(set=0,binding = 0) uniform ViewProj {
+  mat4 view;
+  mat4 proj;
+} view_proj;
+
+
+layout(std430, set = 0, binding = 1) buffer PixelData {
+    HitData hit_data[];
+};
+
+layout(rgba32f, binding = 2) uniform image2D StorageImage;
+
+void main() {
+    uint index = gl_GlobalInvocationID.x;
+
+    hit_data[index].depth = 1;
+}
