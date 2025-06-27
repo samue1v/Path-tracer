@@ -63,7 +63,8 @@ VulkanRender::~VulkanRender() {
 
   chain.cleanUp();
 
-  compute.storageImg.cleanUp();
+  compute.storageImg[0].cleanUp();
+  compute.storageImg[1].cleanUp();
 
   compute.uniformBuffer.cleanUp();
 
@@ -147,8 +148,11 @@ void VulkanRender::createImageResources() {
       vk::ImageUsageFlagBits::eStorage | vk::ImageUsageFlagBits::eTransferSrc;
   createInfo.initialLayout = vk::ImageLayout::eUndefined;
 
-  compute.storageImg.createImage(logicalDevice, allocator, createInfo);
-  compute.storageImg.createView(vk::ImageAspectFlagBits::eColor);
+  for (auto &img : compute.storageImg) {
+
+    img.createImage(logicalDevice, allocator, createInfo);
+    img.createView(vk::ImageAspectFlagBits::eColor);
+  }
 }
 
 void VulkanRender::createBufferResources() {
@@ -191,8 +195,23 @@ void VulkanRender::drawFrame() {
   showPerformanceMenu();
   showMenu();
 
+  if (logicalDevice.getFenceStatus(
+          compute.computeFences[compute.currentComputeBuffer]) ==
+      vk::Result::eSuccess) {
+
+    logicalDevice.resetFences(
+        1, &compute.computeFences[compute.currentComputeBuffer]);
+
+    copyComputeToSwapchain(compute.currentComputeBuffer);
+
+    uint32_t nextComputeBuffer = (compute.currentComputeBuffer + 1) % 2;
+    recordComputeCommandBuffer(nextComputeBuffer);
+
+    compute.currentComputeBuffer = nextComputeBuffer;
+  }
+
   graphics.commandBuffer[currentFrame].reset();
-  recordCommandBuffer(graphics.commandBuffer[currentFrame], imageIdx);
+  recordGraphicCommandBuffer(graphics.commandBuffer[currentFrame], imageIdx);
 
   vk::Semaphore waitSemaphores[] = {imageAvailableSemaphores[currentFrame]};
   vk::Semaphore signalSemaphores[] = {renderFinishedSemaphores[currentFrame]};
@@ -239,17 +258,28 @@ void VulkanRender::drawFrame() {
   currentFrame = (currentFrame + 1) % framesInFlight;
 }
 
+void VulkanRender::recordComputeCommandBuffer(uint32_t commandBufferIndex) {
+  // TODO ...
+}
+
+void VulkanRender::copyComputeToSwapchain(uint32_t commandBufferIndex) {
+  // TODO ..
+}
+
 void VulkanRender::createDescriptorSets() {
+
+  std::array<vk::DescriptorSetLayout, 2> layouts{compute.descriptorSetLayout,
+                                                 compute.descriptorSetLayout};
 
   vk::DescriptorSetAllocateInfo allocInfo;
   allocInfo.sType = vk::StructureType::eDescriptorSetAllocateInfo;
   allocInfo.descriptorPool = compute.descriptorPool;
-  allocInfo.descriptorSetCount = 1;
-  allocInfo.pSetLayouts = &compute.descriptorSetLayout;
+  allocInfo.descriptorSetCount = 2;
+  allocInfo.pSetLayouts = layouts.data();
 
   auto resAlloc = logicalDevice.allocateDescriptorSets(allocInfo);
   assert(resAlloc.result == vk::Result::eSuccess);
-  compute.descriptorSet = resAlloc.value;
+  compute.descriptorSet = {resAlloc.value[0], resAlloc.value[1]};
 
   vk::DescriptorBufferInfo uniformBufferInfo{};
   uniformBufferInfo.buffer = compute.uniformBuffer.buffer;
@@ -261,37 +291,44 @@ void VulkanRender::createDescriptorSets() {
   storageBufferInfo.offset = 0;
   storageBufferInfo.range = sizeof(hitData);
 
-  vk::DescriptorImageInfo imageInfo{};
-  imageInfo.imageView = compute.storageImg.view_;
-  imageInfo.imageLayout = compute.storageImg.currentLayout_;
+  vk::DescriptorImageInfo imageInfoA{};
+  imageInfoA.imageView = compute.storageImg[0].view_;
+  imageInfoA.imageLayout = compute.storageImg[0].currentLayout_;
 
-  std::array<vk::WriteDescriptorSet, 3> descriptorWrites;
+  vk::DescriptorImageInfo imageInfoB{};
+  imageInfoB.imageView = compute.storageImg[1].view_;
+  imageInfoB.imageLayout = compute.storageImg[1].currentLayout_;
 
-  descriptorWrites[0].sType = vk::StructureType::eWriteDescriptorSet;
-  descriptorWrites[0].dstSet = compute.descriptorSet[0];
-  descriptorWrites[0].dstBinding = 0;
-  descriptorWrites[0].dstArrayElement = 0;
-  descriptorWrites[0].descriptorType = vk::DescriptorType::eUniformBuffer;
-  descriptorWrites[0].descriptorCount = 1;
-  descriptorWrites[0].pBufferInfo = &uniformBufferInfo;
+  for (int i = 0; i < 2; i++) {
 
-  descriptorWrites[1].sType = vk::StructureType::eWriteDescriptorSet;
-  descriptorWrites[1].dstSet = compute.descriptorSet[0];
-  descriptorWrites[1].dstBinding = 1;
-  descriptorWrites[1].dstArrayElement = 0;
-  descriptorWrites[1].descriptorType = vk::DescriptorType::eStorageBuffer;
-  descriptorWrites[1].descriptorCount = 1;
-  descriptorWrites[1].pBufferInfo = &storageBufferInfo;
+    std::array<vk::WriteDescriptorSet, 3> descriptorWrites;
 
-  descriptorWrites[2].sType = vk::StructureType::eWriteDescriptorSet;
-  descriptorWrites[2].dstSet = compute.descriptorSet[0];
-  descriptorWrites[2].dstBinding = 2;
-  descriptorWrites[2].dstArrayElement = 0;
-  descriptorWrites[2].descriptorType = vk::DescriptorType::eStorageImage;
-  descriptorWrites[2].descriptorCount = 1;
-  descriptorWrites[2].pImageInfo = &imageInfo;
+    descriptorWrites[0].sType = vk::StructureType::eWriteDescriptorSet;
+    descriptorWrites[0].dstSet = compute.descriptorSet[i];
+    descriptorWrites[0].dstBinding = 0;
+    descriptorWrites[0].dstArrayElement = 0;
+    descriptorWrites[0].descriptorType = vk::DescriptorType::eUniformBuffer;
+    descriptorWrites[0].descriptorCount = 1;
+    descriptorWrites[0].pBufferInfo = &uniformBufferInfo;
 
-  logicalDevice.updateDescriptorSets(descriptorWrites, nullptr);
+    descriptorWrites[1].sType = vk::StructureType::eWriteDescriptorSet;
+    descriptorWrites[1].dstSet = compute.descriptorSet[i];
+    descriptorWrites[1].dstBinding = 1;
+    descriptorWrites[1].dstArrayElement = 0;
+    descriptorWrites[1].descriptorType = vk::DescriptorType::eStorageBuffer;
+    descriptorWrites[1].descriptorCount = 1;
+    descriptorWrites[1].pBufferInfo = &storageBufferInfo;
+
+    descriptorWrites[2].sType = vk::StructureType::eWriteDescriptorSet;
+    descriptorWrites[2].dstSet = compute.descriptorSet[i];
+    descriptorWrites[2].dstBinding = 2;
+    descriptorWrites[2].dstArrayElement = 0;
+    descriptorWrites[2].descriptorType = vk::DescriptorType::eStorageImage;
+    descriptorWrites[2].descriptorCount = 1;
+    descriptorWrites[2].pImageInfo = i == 0 ? &imageInfoA : &imageInfoB;
+
+    logicalDevice.updateDescriptorSets(descriptorWrites, nullptr);
+  }
 }
 
 void VulkanRender::createInstance() {
@@ -685,11 +722,8 @@ void VulkanRender::buildRenderPass() {
 
   dependency.srcAccessMask = vk::AccessFlagBits::eNone;
 
-  dependency.dstStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput |
-                            vk::PipelineStageFlagBits::eEarlyFragmentTests;
-  dependency.dstAccessMask = vk::AccessFlagBits::eColorAttachmentWrite |
-                             vk::AccessFlagBits::eDepthStencilAttachmentWrite;
-
+  dependency.dstStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput;
+  dependency.dstAccessMask = vk::AccessFlagBits::eColorAttachmentWrite;
   std::array<vk::AttachmentDescription, 1> attachments = {colorAttachment};
 
   vk::RenderPassCreateInfo renderPassInfo{};
@@ -702,15 +736,11 @@ void VulkanRender::buildRenderPass() {
   renderPassInfo.pDependencies = &dependency;
 
   auto res = logicalDevice.createRenderPass(renderPassInfo);
-  if (res.result == vk::Result::eSuccess) {
-    renderPass = res.value;
+  assert(res.result == vk::Result::eSuccess);
 
-    deviceGlobalGarbageQueue.push_back(
-
-        [this](vk::Device device) { device.destroyRenderPass(renderPass); });
-  } else {
-    throw std::runtime_error("failed to create render pass!");
-  }
+  renderPass = res.value;
+  deviceGlobalGarbageQueue.push_back(
+      [this](vk::Device device) { device.destroyRenderPass(renderPass); });
 }
 
 void VulkanRender::createCommandPool() {
@@ -758,15 +788,13 @@ void VulkanRender::createCommandBuffers() {
 
   auto res = logicalDevice.allocateCommandBuffers(
       &allocInfo, graphics.commandBuffer.data());
-  if (res != vk::Result::eSuccess) {
-    throw std::runtime_error("Failed to allocate command buffer");
-  }
+  assert(res == vk::Result::eSuccess);
 
   // TODO crete compute cmd buffer
 }
 
-void VulkanRender::recordCommandBuffer(vk::CommandBuffer commandBuffer,
-                                       uint32_t imageIndex) {
+void VulkanRender::recordGraphicCommandBuffer(vk::CommandBuffer commandBuffer,
+                                              uint32_t imageIndex) {
   vk::CommandBufferBeginInfo beginInfo{};
   beginInfo.sType = vk::StructureType::eCommandBufferBeginInfo;
   beginInfo.pInheritanceInfo = nullptr;
@@ -794,7 +822,6 @@ void VulkanRender::recordCommandBuffer(vk::CommandBuffer commandBuffer,
   renderPassInfo.renderArea.offset = vk::Offset2D(0, 0);
   renderPassInfo.renderArea.extent = chain.extent;
   renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
-  ;
   renderPassInfo.pClearValues = clearValues.data();
 
   commandBuffer.beginRenderPass(&renderPassInfo, vk::SubpassContents::eInline);
@@ -863,6 +890,27 @@ void VulkanRender::createSyncObjects() {
       device.destroyFence(inFlightFences[i]);
     }
   });
+
+  vk::FenceCreateInfo fenceInfoCompute{};
+  fenceInfoCompute.sType = vk::StructureType::eFenceCreateInfo;
+  for (int i = 0; i < 2; i++) {
+    auto rescf = logicalDevice.createFence(fenceInfoCompute);
+    assert(rescf.result == vk::Result::eSuccess);
+    compute.computeFences[i] = rescf.value;
+  }
+  vk::SemaphoreCreateInfo semaphoreInfoCompute{};
+  semaphoreInfoCompute.sType = vk::StructureType::eSemaphoreCreateInfo;
+
+  auto rescs = logicalDevice.createSemaphore(semaphoreInfoCompute);
+  assert(rescs.result == vk::Result::eSuccess);
+  compute.computeFinishedSemaphore = rescs.value;
+
+  deviceGlobalGarbageQueue.push_back([this](vk::Device device) {
+    for (int i = 0; i < 2; i++) {
+      device.destroyFence(compute.computeFences[i]);
+    }
+    device.destroySemaphore(compute.computeFinishedSemaphore);
+  });
 }
 
 void VulkanRender::createDescriptorSetLayout() {
@@ -908,10 +956,14 @@ void VulkanRender::createDescriptorSetLayout() {
 }
 
 void VulkanRender::createPipeline() {
-  vk::PipelineLayoutCreateInfo layoutCreateInfo{};
-  layoutCreateInfo.sType = vk::StructureType::ePipelineLayoutCreateInfo;
-  layoutCreateInfo.setLayoutCount = 1;
-  layoutCreateInfo.pSetLayouts = &compute.descriptorSetLayout;
+
+  std::array<vk::DescriptorSetLayout, 2> layouts{compute.descriptorSetLayout,
+                                                 compute.descriptorSetLayout};
+
+  vk::PipelineLayoutCreateInfo computeLayoutCreateInfo{};
+  computeLayoutCreateInfo.sType = vk::StructureType::ePipelineLayoutCreateInfo;
+  computeLayoutCreateInfo.setLayoutCount = 2;
+  computeLayoutCreateInfo.pSetLayouts = layouts.data();
   compute.pipeline.createPipeline(logicalDevice, "pathTracer.comp.spv",
                                   compute.descriptorSetLayout,
                                   deviceGlobalGarbageQueue);
@@ -921,19 +973,19 @@ void VulkanRender::createDescriptorPool() {
   std::array<vk::DescriptorPoolSize, 3> poolSizes = {};
 
   poolSizes[0].type = vk::DescriptorType::eUniformBuffer;
-  poolSizes[0].descriptorCount = 1;
+  poolSizes[0].descriptorCount = 2;
 
   poolSizes[1].type = vk::DescriptorType::eStorageBuffer;
-  poolSizes[1].descriptorCount = 1;
+  poolSizes[1].descriptorCount = 2;
 
   poolSizes[2].type = vk::DescriptorType::eStorageImage;
-  poolSizes[2].descriptorCount = 1;
+  poolSizes[2].descriptorCount = 2;
 
   vk::DescriptorPoolCreateInfo poolInfo{};
   poolInfo.sType = vk::StructureType::eDescriptorPoolCreateInfo;
   poolInfo.poolSizeCount = poolSizes.size();
   poolInfo.pPoolSizes = poolSizes.data();
-  poolInfo.maxSets = 1;
+  poolInfo.maxSets = 2;
 
   auto res = logicalDevice.createDescriptorPool(poolInfo);
   assert(res.result == vk::Result::eSuccess);

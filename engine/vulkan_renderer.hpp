@@ -43,6 +43,15 @@ struct alignas(16) hitData {
   int pad[3];
 };
 
+struct alignas(16) data {
+  int numSpheres;
+  int numPlanes;
+  int numLights;
+  int numRays;
+  int maxBounces;
+  int pad[3];
+};
+
 /**
  * @brief Vulkan Engine Renderer
  */
@@ -56,7 +65,7 @@ public:
 
     vk::DescriptorSet descriptorSetPostCompute{VK_NULL_HANDLE};
 
-    vk::Pipeline pipeline{VK_NULL_HANDLE};
+    Pipeline pipeline;
     vk::PipelineLayout pipelineLayout{VK_NULL_HANDLE};
     vk::Semaphore semaphore{VK_NULL_HANDLE};
     vk::Queue queue{VK_NULL_HANDLE};
@@ -74,21 +83,18 @@ public:
 
     vk::CommandBuffer commandBuffer{VK_NULL_HANDLE};
 
-    vk::Semaphore semaphore{VK_NULL_HANDLE};
-
-    vk::DescriptorSetLayout descriptorSetLayout{VK_NULL_HANDLE};
-
-    std::vector<vk::DescriptorSet> descriptorSet;
-
+    vk::DescriptorSetLayout descriptorSetLayout;
+    std::array<vk::DescriptorSet, 2> descriptorSet;
     vk::DescriptorPool descriptorPool{VK_NULL_HANDLE};
-
     Pipeline pipeline;
-    int32_t pipelineIndex{0};
 
     Buffer uniformBuffer;
     Buffer storageBuffer;
+    std::array<ResourceImage, 2> storageImg;
 
-    ResourceImage storageImg;
+    std::array<vk::Fence, 2> computeFences;
+    vk::Semaphore computeFinishedSemaphore;
+    uint32_t currentComputeBuffer = 0;
 
     static constexpr uint32_t rays_per_pixel = 1;
   } compute;
@@ -251,8 +257,8 @@ private:
   /**
    * @brief Record draw command in the command buffer
    */
-  void recordCommandBuffer(vk::CommandBuffer commandBuffer,
-                           uint32_t imageIndex);
+  void recordGraphicCommandBuffer(vk::CommandBuffer commandBuffer,
+                                  uint32_t imageIndex);
 
   /**
    * @brief Create uniform buffers
@@ -281,8 +287,27 @@ private:
                                  vk::ImageTiling tiling,
                                  vk::FormatFeatureFlagBits features);
 
+  /**
+   * @brief Check if given format has a stencil component
+   * @param format Format to be evaluated
+   */
   bool hasStencilComponent(vk::Format format);
 
+  /**
+   * @brief Copy the current storage image to swapchain image
+   * @param commandBufferIndex index of target command buffer and storage image to record
+   */
+  void copyComputeToSwapchain(uint32_t commandBufferIndex);
+
+  /**
+   * @brief Record compute command buffer
+   * @param computeIndex index of target command buffer and storage image to record
+   */
+  void recordComputeCommandBuffer(uint32_t computeIndex);
+
+  /**
+   * @brief Init IMGUI external lib
+   */
   void initIMGUI();
 
 private:

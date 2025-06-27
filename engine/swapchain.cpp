@@ -1,6 +1,5 @@
 #include "swapchain.hpp"
 
-
 void Swapchain::create(vk::Device logicalDevice,
                        vk::PhysicalDevice physicalDevice,
                        vk::SurfaceKHR surface, uint32_t width,
@@ -19,6 +18,7 @@ void Swapchain::create(vk::Device logicalDevice,
   format = chooseSurfaceFormat(formats);
 
   vk::PresentModeKHR presentMode = choosePresentMode(presentModes);
+
 
   extent = chooseExtent(width, height, capabilities);
 
@@ -53,7 +53,9 @@ void Swapchain::create(vk::Device logicalDevice,
   */
   vk::SwapchainCreateInfoKHR createInfo = vk::SwapchainCreateInfoKHR(
       vk::SwapchainCreateFlagsKHR(), surface, imageCount, format.format,
-      format.colorSpace, extent, 1, vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eTransferDst);
+      format.colorSpace, extent, 1,
+      vk::ImageUsageFlagBits::eColorAttachment |
+          vk::ImageUsageFlagBits::eTransferDst);
 
   createInfo.preTransform = capabilities.currentTransform;
   createInfo.presentMode = presentMode;
@@ -84,7 +86,6 @@ void Swapchain::build(vk::RenderPass renderPass) {
 
 void Swapchain::cleanUp() {
 
-
   while (chainGarbageQueue.size() > 0) {
     chainGarbageQueue.back()(logicalDevice);
     chainGarbageQueue.pop_back();
@@ -110,12 +111,14 @@ vk::Extent2D Swapchain::chooseExtent(uint32_t width, uint32_t height,
 vk::PresentModeKHR
 Swapchain::choosePresentMode(std::vector<vk::PresentModeKHR> presentModes) {
   for (vk::PresentModeKHR mode : presentModes) {
-    if (/*mode == vk::PresentModeKHR::eMailbox*/ mode ==
-        vk::PresentModeKHR::eImmediate) {
+    if (mode == vk::PresentModeKHR::eMailbox /*mode ==
+        vk::PresentModeKHR::eImmediate*/) {
+      Logger::log(Logger::LogLevel::DEBUG, "Present Mode: MailBox/Immediate");
       return mode;
     }
   }
 
+  Logger::log(Logger::LogLevel::DEBUG, "Present Mode: FIFO");
   return vk::PresentModeKHR::eFifo;
 }
 
@@ -136,13 +139,11 @@ Swapchain::chooseSurfaceFormat(std::vector<vk::SurfaceFormatKHR> formats) {
   return formats[0];
 }
 
-
 void Swapchain::createFrameBuffers(vk::RenderPass renderPass) {
   frameBuffers.resize(imageCount);
 
   for (size_t i = 0; i < imageCount; i++) {
-    std::array<vk::ImageView, 1> attachments = {
-        frames[i].imageView};
+    std::array<vk::ImageView, 1> attachments = {frames[i].imageView};
 
     vk::FramebufferCreateInfo framebufferInfo{};
     framebufferInfo.sType = vk::StructureType::
