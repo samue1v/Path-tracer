@@ -62,14 +62,16 @@ public:
 
     vk::DescriptorSetLayout descriptorSetLayout{VK_NULL_HANDLE};
     vk::DescriptorSet descriptorSetPreCompute{VK_NULL_HANDLE};
-
     vk::DescriptorSet descriptorSetPostCompute{VK_NULL_HANDLE};
 
     Pipeline pipeline;
     vk::PipelineLayout pipelineLayout{VK_NULL_HANDLE};
-    vk::Semaphore semaphore{VK_NULL_HANDLE};
+    vk::Semaphore acquireSemaphore,releaseSemaphore, copySemaphore;
+    vk::Fence copyFinishFence;
     vk::Queue queue{VK_NULL_HANDLE};
+    uint32_t queueIDX;
     std::vector<vk::CommandBuffer> commandBuffer{};
+    vk::CommandBuffer acquireBuffer, releaseBuffer, copyBuffer;
 
     vk::CommandPool commandPool{VK_NULL_HANDLE};
 
@@ -77,23 +79,30 @@ public:
 
   // Resources for the compute part of the example
   struct Compute {
+    enum imageUsageType{
+      compute = 0,
+      display = 1
+    };
     vk::Queue queue{VK_NULL_HANDLE};
+    uint32_t queueIDX;
 
     vk::CommandPool commandPool{VK_NULL_HANDLE};
 
-    vk::CommandBuffer commandBuffer{VK_NULL_HANDLE};
+    vk::CommandBuffer commandBuffer;
 
     vk::DescriptorSetLayout descriptorSetLayout;
-    std::array<vk::DescriptorSet, 2> descriptorSet;
+    vk::DescriptorSet  descriptorSet;
     vk::DescriptorPool descriptorPool{VK_NULL_HANDLE};
     Pipeline pipeline;
 
+    vk::CommandBuffer acquireBuffer, releaseBuffer;
     Buffer uniformBuffer;
     Buffer storageBuffer;
     std::array<ResourceImage, 2> storageImg;
 
-    std::array<vk::Fence, 2> computeFences;
-    vk::Semaphore computeFinishedSemaphore;
+    vk::Fence computeFence;
+    vk::Semaphore computeFinishedSemaphore; // Framesinflight = 3
+    vk::Semaphore acquireSemaphore,releaseSemaphore;
     uint32_t currentComputeBuffer = 0;
 
     static constexpr uint32_t rays_per_pixel = 1;
@@ -225,6 +234,11 @@ private:
   void createSwapChain();
 
   /**
+   * @brief Build the swapchain images
+   */
+  void buildSwapchainImages();
+
+  /**
    * @brief Creates the command pool
    */
   void createCommandPool();
@@ -294,16 +308,32 @@ private:
   bool hasStencilComponent(vk::Format format);
 
   /**
-   * @brief Copy the current storage image to swapchain image
-   * @param commandBufferIndex index of target command buffer and storage image to record
+   * @brief Handle the function swap from storage images
    */
-  void copyComputeToSwapchain(uint32_t commandBufferIndex);
+  void swapComputePresentImages();
 
   /**
    * @brief Record compute command buffer
-   * @param computeIndex index of target command buffer and storage image to record
+   * @param cmdBuffer Target command buffer and storage image to
+   * record
    */
-  void recordComputeCommandBuffer(uint32_t computeIndex);
+  void recordComputeCommandBuffer(vk::CommandBuffer cmdBuffer);
+
+  /**
+   * @brief Prepare images storage image and swapchain image for copy storage ->
+   * swap
+   * @params commandBuffer Command buffer for the operation
+   * @params imageIdx Index of in flight frame swapchain image
+   */
+  void fromSwapchainToTransfer(vk::CommandBuffer commandBuffer, vk::Image img);
+
+  /**
+   * @brief Prepare swapchain image from transfer state to present transfer ->
+   * present
+   * @params commandBuffer Command buffer for the operation
+   * @params Current in flight frame swapchain image
+   */
+  void fromTransferToSwapchain(vk::CommandBuffer, vk::Image img);
 
   /**
    * @brief Init IMGUI external lib

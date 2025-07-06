@@ -1,4 +1,7 @@
 #version 450
+
+layout(local_size_x = 16, local_size_y = 16) in;
+
 struct HitData {
   vec4 wo;
   vec4 wi;
@@ -18,10 +21,19 @@ layout(std430, set = 0, binding = 1) buffer PixelData {
     HitData hit_data[];
 };
 
-layout(rgba32f, binding = 2) uniform image2D StorageImage;
+layout(rgba8, binding = 2) uniform image2D StorageImage;
 
 void main() {
-    uint index = gl_GlobalInvocationID.x;
-
+    uvec2 gid = gl_GlobalInvocationID.xy;
+    ivec2 imageSize = imageSize(StorageImage);
+    uint index = gid.y * imageSize.x + gid.x;
     hit_data[index].depth = 1;
+    ivec2 pos = ivec2(gid);
+    ivec2 center = imageSize / 2;
+    uvec4 color = uvec4(0, 0, 0, 255); 
+    ivec2 delta = pos - center;
+    if (dot(delta, delta) <= 200 * 200) {
+      color = uvec4(0, 0, 255, 255);
+    }
+    imageStore(StorageImage, pos, color);
 }

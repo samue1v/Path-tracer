@@ -111,8 +111,8 @@ vk::Extent2D Swapchain::chooseExtent(uint32_t width, uint32_t height,
 vk::PresentModeKHR
 Swapchain::choosePresentMode(std::vector<vk::PresentModeKHR> presentModes) {
   for (vk::PresentModeKHR mode : presentModes) {
-    if (mode == vk::PresentModeKHR::eMailbox /*mode ==
-        vk::PresentModeKHR::eImmediate*/) {
+    if (/*mode == vk::PresentModeKHR::eMailbox*/ mode ==
+        vk::PresentModeKHR::eImmediate) {
       Logger::log(Logger::LogLevel::DEBUG, "Present Mode: MailBox/Immediate");
       return mode;
     }
@@ -124,13 +124,15 @@ Swapchain::choosePresentMode(std::vector<vk::PresentModeKHR> presentModes) {
 
 vk::SurfaceFormatKHR
 Swapchain::chooseSurfaceFormat(std::vector<vk::SurfaceFormatKHR> formats) {
+
+  Logger::log(Logger::LogLevel::DEBUG,"Avaliable formats: " + std::to_string(formats.size()));
   for (vk::SurfaceFormatKHR format : formats) {
     if (enableValidationLayers && chain == vk::SwapchainKHR{}) {
       Logger::log(Logger::LogLevel::DEBUG,
                   "Surface Format: " + vk::to_string(format.format) + " | " +
                       vk::to_string(format.colorSpace));
     }
-    if (format.format == vk::Format::eB8G8R8A8Unorm &&
+    if (format.format == vk::Format::eR8G8B8A8Unorm &&
         format.colorSpace == vk::ColorSpaceKHR::eSrgbNonlinear) {
       return format;
     }

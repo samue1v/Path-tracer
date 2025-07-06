@@ -33,7 +33,7 @@ void VulkanRender::init() {
 
   buildRenderPass();
 
-  chain.build(renderPass);
+  buildSwapchainImages();
 
   createImageResources();
 
@@ -122,7 +122,7 @@ void VulkanRender::createUniformBuffers() {
 }
 
 void VulkanRender::createImageResources() {
-  const vk::Format fmt = vk::Format::eR32G32B32A32Sfloat;
+  const vk::Format fmt = vk::Format::eR8G8B8A8Unorm;
   vk::FormatProperties fmtProps = physicalDevice.getFormatProperties(fmt);
   assert(fmtProps.optimalTilingFeatures &
          vk::FormatFeatureFlagBits::eStorageImage);
@@ -141,18 +141,61 @@ void VulkanRender::createImageResources() {
   createInfo.arrayLayers = 1;
   createInfo.samples = vk::SampleCountFlagBits::e1;
   createInfo.tiling = vk::ImageTiling::eOptimal;
-  createInfo.sharingMode = vk::SharingMode::eConcurrent;
+  createInfo.sharingMode = vk::SharingMode::eExclusive;
   createInfo.pQueueFamilyIndices = qFamilies.data();
   createInfo.queueFamilyIndexCount = qFamilies.size();
-  createInfo.usage =
-      vk::ImageUsageFlagBits::eStorage | vk::ImageUsageFlagBits::eTransferSrc;
+  createInfo.usage = vk::ImageUsageFlagBits::eStorage |
+                     vk::ImageUsageFlagBits::eTransferSrc |
+                     vk::ImageUsageFlagBits::eTransferDst;
   createInfo.initialLayout = vk::ImageLayout::eUndefined;
 
-  for (auto &img : compute.storageImg) {
+  vk::CommandBufferAllocateInfo allocInfo{};
+  allocInfo.sType = vk::StructureType::eCommandBufferAllocateInfo;
+  allocInfo.level = vk::CommandBufferLevel::ePrimary;
+  allocInfo.commandPool = compute.commandPool;
+  allocInfo.commandBufferCount = 1;
 
-    img.createImage(logicalDevice, allocator, createInfo);
-    img.createView(vk::ImageAspectFlagBits::eColor);
-  }
+  vk::CommandBuffer commandBuffer;
+  logicalDevice.allocateCommandBuffers(&allocInfo, &commandBuffer);
+
+  vk::CommandBufferBeginInfo beginInfo{};
+  beginInfo.sType = vk::StructureType::eCommandBufferBeginInfo;
+  beginInfo.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit;
+
+  commandBuffer.begin(beginInfo);
+
+  compute.storageImg[compute.imageUsageType::compute].createImage(
+      logicalDevice, allocator, createInfo);
+  compute.storageImg[compute.imageUsageType::compute].createView(
+      vk::ImageAspectFlagBits::eColor);
+  compute.storageImg[compute.imageUsageType::compute].transitionLayout(
+      commandBuffer, {compute.queueIDX, compute.queueIDX},
+      vk::ImageLayout::eUndefined, vk::ImageLayout::eGeneral,
+      vk::AccessFlagBits::eNone, vk::AccessFlagBits::eShaderWrite,
+      vk::PipelineStageFlagBits::eTopOfPipe,
+      vk::PipelineStageFlagBits::eComputeShader);
+
+  compute.storageImg[compute.imageUsageType::display].createImage(
+      logicalDevice, allocator, createInfo);
+  compute.storageImg[compute.imageUsageType::display].createView(
+      vk::ImageAspectFlagBits::eColor);
+  compute.storageImg[compute.imageUsageType::display].transitionLayout(
+      commandBuffer, {graphics.queueIDX, graphics.queueIDX},
+      vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferSrcOptimal,
+      vk::AccessFlagBits::eNone, vk::AccessFlagBits::eTransferRead,
+      vk::PipelineStageFlagBits::eTopOfPipe,
+      vk::PipelineStageFlagBits::eTransfer);
+
+  commandBuffer.end();
+
+  vk::SubmitInfo submitInfo{};
+  submitInfo.commandBufferCount = 1;
+  submitInfo.pCommandBuffers = &commandBuffer;
+
+  compute.queue.submit(1, &submitInfo, nullptr);
+  compute.queue.waitIdle();
+
+  logicalDevice.freeCommandBuffers(compute.commandPool, 1, &commandBuffer);
 }
 
 void VulkanRender::createBufferResources() {
@@ -195,19 +238,28 @@ void VulkanRender::drawFrame() {
   showPerformanceMenu();
   showMenu();
 
-  if (logicalDevice.getFenceStatus(
-          compute.computeFences[compute.currentComputeBuffer]) ==
-      vk::Result::eSuccess) {
+   if (logicalDevice.getFenceStatus(compute.computeFence) ==
+       vk::Result::eSuccess) {
+     // Logger::log(Logger::LogLevel::DEBUG,
+     //             "Compute Fence done for buffer number " +
+     //                 std::to_string(compute.currentComputeBuffer));
+     logicalDevice.resetFences(1, &compute.computeFence);
+     swapComputePresentImages();
+     recordComputeCommandBuffer(compute.commandBuffer);
 
-    logicalDevice.resetFences(
-        1, &compute.computeFences[compute.currentComputeBuffer]);
+     vk::PipelineStageFlags waitStageCompute = vk::PipelineStageFlagBits::eTransfer;
+    vk::SubmitInfo submitInfo{};
+    submitInfo.sType = vk::StructureType::eSubmitInfo;
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &compute.commandBuffer;
+    //submitInfo.signalSemaphoreCount = 1;
+    //submitInfo.pSignalSemaphores = &compute.computeFinishedSemaphore;
+    submitInfo.waitSemaphoreCount = 1;
+    submitInfo.pWaitSemaphores = &compute.acquireSemaphore;
+    submitInfo.pWaitDstStageMask = &waitStageCompute;
 
-    copyComputeToSwapchain(compute.currentComputeBuffer);
-
-    uint32_t nextComputeBuffer = (compute.currentComputeBuffer + 1) % 2;
-    recordComputeCommandBuffer(nextComputeBuffer);
-
-    compute.currentComputeBuffer = nextComputeBuffer;
+    compute.queue.submit(1, &submitInfo, compute.computeFence);
+    //logicalDevice.waitForFences(1,&compute.computeFence,1, UINT64_MAX);
   }
 
   graphics.commandBuffer[currentFrame].reset();
@@ -258,28 +310,273 @@ void VulkanRender::drawFrame() {
   currentFrame = (currentFrame + 1) % framesInFlight;
 }
 
-void VulkanRender::recordComputeCommandBuffer(uint32_t commandBufferIndex) {
-  // TODO ...
+void VulkanRender::swapComputePresentImages() {
+
+  compute.acquireBuffer.reset();
+  compute.releaseBuffer.reset();
+  graphics.acquireBuffer.reset();
+  graphics.releaseBuffer.reset();
+  graphics.copyBuffer.reset();
+
+  vk::CommandBufferBeginInfo beginInfo{};
+  beginInfo.sType = vk::StructureType::eCommandBufferBeginInfo;
+  assert(compute.releaseBuffer.begin(&beginInfo) == vk::Result::eSuccess);
+
+  // Transition compute image from GENERAL to TRANSFERSRC
+  compute.storageImg[compute.imageUsageType::compute].transitionLayout(
+      compute.releaseBuffer, {compute.queueIDX, graphics.queueIDX},
+      vk::ImageLayout::eGeneral, vk::ImageLayout::eTransferSrcOptimal,
+      vk::AccessFlagBits::eShaderWrite, vk::AccessFlagBits::eTransferRead,
+      vk::PipelineStageFlagBits::eComputeShader,
+      vk::PipelineStageFlagBits::eTransfer);
+
+  compute.releaseBuffer.end();
+
+  vk::SubmitInfo releaseBufferSubmitInfo{};
+  releaseBufferSubmitInfo.sType = vk::StructureType::eSubmitInfo;
+  releaseBufferSubmitInfo.commandBufferCount = 1;
+  releaseBufferSubmitInfo.pCommandBuffers = &compute.releaseBuffer;
+  releaseBufferSubmitInfo.signalSemaphoreCount = 1;
+  releaseBufferSubmitInfo.pSignalSemaphores = &compute.releaseSemaphore;
+
+  compute.queue.submit(releaseBufferSubmitInfo);
+
+  // acquire image from compute !!!
+
+  graphics.acquireBuffer.begin(beginInfo);
+
+  compute.storageImg[compute.imageUsageType::compute].transitionLayout(
+      graphics.acquireBuffer, {compute.queueIDX, graphics.queueIDX},
+      vk::ImageLayout::eGeneral, vk::ImageLayout::eTransferSrcOptimal,
+      vk::AccessFlagBits::eShaderWrite, vk::AccessFlagBits::eTransferRead,
+      vk::PipelineStageFlagBits::eTopOfPipe,
+      vk::PipelineStageFlagBits::eTransfer);
+
+  // Transition display image from TRANSFERSRC to TRANSFERDST
+  compute.storageImg[compute.imageUsageType::display].transitionLayout(
+      graphics.acquireBuffer, {graphics.queueIDX, graphics.queueIDX},
+      vk::ImageLayout::eTransferSrcOptimal,
+      vk::ImageLayout::eTransferDstOptimal, vk::AccessFlagBits::eTransferRead,
+      vk::AccessFlagBits::eTransferWrite, vk::PipelineStageFlagBits::eTransfer,
+      vk::PipelineStageFlagBits::eTransfer);
+
+  graphics.acquireBuffer.end();
+
+  vk::PipelineStageFlags graphicAcquireWaitStage =
+      vk::PipelineStageFlagBits::eTransfer;
+
+  vk::SubmitInfo acquireBufferSubmitInfo{};
+  acquireBufferSubmitInfo.sType = vk::StructureType::eSubmitInfo;
+  acquireBufferSubmitInfo.commandBufferCount = 1;
+  acquireBufferSubmitInfo.pCommandBuffers = &graphics.acquireBuffer;
+  acquireBufferSubmitInfo.waitSemaphoreCount = 1;
+  acquireBufferSubmitInfo.pWaitSemaphores = &compute.releaseSemaphore;
+  acquireBufferSubmitInfo.pWaitDstStageMask = &graphicAcquireWaitStage;
+  acquireBufferSubmitInfo.signalSemaphoreCount = 1;
+  acquireBufferSubmitInfo.pSignalSemaphores = &graphics.acquireSemaphore;
+
+  graphics.queue.submit(acquireBufferSubmitInfo);
+
+  graphics.copyBuffer.begin(beginInfo);
+
+  vk::ImageCopy copyRegion{};
+  copyRegion.srcOffset = vk::Offset3D(0, 0, 0);
+  copyRegion.srcSubresource.baseArrayLayer = 0;
+  copyRegion.srcSubresource.layerCount = 1;
+  copyRegion.srcSubresource.mipLevel = 0;
+  copyRegion.srcSubresource.aspectMask = vk::ImageAspectFlagBits::eColor;
+
+  copyRegion.dstOffset = vk::Offset3D(0, 0, 0);
+  copyRegion.dstSubresource.baseArrayLayer = 0;
+  copyRegion.dstSubresource.layerCount = 1;
+  copyRegion.dstSubresource.mipLevel = 0;
+  copyRegion.dstSubresource.aspectMask = vk::ImageAspectFlagBits::eColor;
+
+  copyRegion.extent = {{chain.extent.width, chain.extent.height, 1}};
+
+  graphics.copyBuffer.copyImage(
+      compute.storageImg[compute.imageUsageType::compute].image_,
+      vk::ImageLayout::eTransferSrcOptimal,
+      compute.storageImg[compute.imageUsageType::display].image_,
+      vk::ImageLayout::eTransferDstOptimal, 1, &copyRegion);
+
+  compute.storageImg[compute.imageUsageType::display].transitionLayout(
+      graphics.copyBuffer, {graphics.queueIDX, graphics.queueIDX},
+      vk::ImageLayout::eTransferDstOptimal,
+      vk::ImageLayout::eTransferSrcOptimal, vk::AccessFlagBits::eTransferWrite,
+      vk::AccessFlagBits::eTransferRead, vk::PipelineStageFlagBits::eTransfer,
+      vk::PipelineStageFlagBits::eTransfer);
+
+  graphics.copyBuffer.end();
+
+  vk::PipelineStageFlags graphicCopyWaitStage =
+      vk::PipelineStageFlagBits::eTransfer;
+
+  vk::SubmitInfo copyBufferSubmitInfo{};
+  copyBufferSubmitInfo.sType = vk::StructureType::eSubmitInfo;
+  copyBufferSubmitInfo.commandBufferCount = 1;
+  copyBufferSubmitInfo.pCommandBuffers = &graphics.copyBuffer;
+  copyBufferSubmitInfo.waitSemaphoreCount = 1;
+  copyBufferSubmitInfo.pWaitSemaphores = &graphics.acquireSemaphore;
+  copyBufferSubmitInfo.pWaitDstStageMask = &graphicCopyWaitStage;
+  copyBufferSubmitInfo.signalSemaphoreCount = 1;
+  copyBufferSubmitInfo.pSignalSemaphores = &graphics.copySemaphore;
+
+  graphics.queue.submit(copyBufferSubmitInfo);
+
+  graphics.releaseBuffer.begin(beginInfo);
+
+  // Transfer ownership back to compute
+  compute.storageImg[compute.imageUsageType::compute].transitionLayout(
+      graphics.releaseBuffer, {graphics.queueIDX, compute.queueIDX},
+      vk::ImageLayout::eTransferSrcOptimal,
+      vk::ImageLayout::eTransferSrcOptimal, vk::AccessFlagBits::eTransferRead,
+      vk::AccessFlagBits::eTransferRead, vk::PipelineStageFlagBits::eTransfer,
+      vk::PipelineStageFlagBits::eTransfer);
+
+  graphics.releaseBuffer.end();
+
+  vk::PipelineStageFlags graphicReleaseWaitStage =
+      vk::PipelineStageFlagBits::eTransfer;
+
+  vk::SubmitInfo releaseGraphicBufferSubmitInfo{};
+  releaseGraphicBufferSubmitInfo.sType = vk::StructureType::eSubmitInfo;
+  releaseGraphicBufferSubmitInfo.commandBufferCount = 1;
+  releaseGraphicBufferSubmitInfo.pCommandBuffers = &graphics.releaseBuffer;
+  releaseGraphicBufferSubmitInfo.waitSemaphoreCount = 1;
+  releaseGraphicBufferSubmitInfo.pWaitSemaphores = &graphics.copySemaphore;
+  releaseGraphicBufferSubmitInfo.pWaitDstStageMask = &graphicReleaseWaitStage;
+  releaseGraphicBufferSubmitInfo.signalSemaphoreCount = 1;
+  releaseGraphicBufferSubmitInfo.pSignalSemaphores = &graphics.releaseSemaphore;
+
+  graphics.queue.submit(releaseGraphicBufferSubmitInfo);
+
+  compute.acquireBuffer.begin(beginInfo);
+
+  // compute.storageImg[compute.imageUsageType::compute].transitionLayout(
+  //     compute.acquireBuffer, {graphics.queueIDX, compute.queueIDX},
+  //     vk::ImageLayout::eTransferSrcOptimal,
+  //     vk::ImageLayout::eTransferSrcOptimal,
+  //     vk::AccessFlagBits::eTransferRead, vk::AccessFlagBits::eTransferRead,
+  //     vk::PipelineStageFlagBits::eTopOfPipe,
+  //     vk::PipelineStageFlagBits::eTransfer);
+
+  compute.storageImg[compute.imageUsageType::compute].transitionLayout(
+      compute.acquireBuffer, {graphics.queueIDX, compute.queueIDX},
+      vk::ImageLayout::eTransferSrcOptimal, vk::ImageLayout::eGeneral,
+      vk::AccessFlagBits::eTransferRead, vk::AccessFlagBits::eShaderWrite,
+      vk::PipelineStageFlagBits::eTransfer,
+      vk::PipelineStageFlagBits::eComputeShader);
+
+  compute.acquireBuffer.end();
+
+  vk::PipelineStageFlags computeAcquireWaitStage =
+      vk::PipelineStageFlagBits::eTransfer;
+
+  vk::SubmitInfo acquireCompBufferSubmitInfo{};
+  acquireCompBufferSubmitInfo.sType = vk::StructureType::eSubmitInfo;
+  acquireCompBufferSubmitInfo.commandBufferCount = 1;
+  acquireCompBufferSubmitInfo.pCommandBuffers = &compute.acquireBuffer;
+  acquireCompBufferSubmitInfo.waitSemaphoreCount = 1;
+  acquireCompBufferSubmitInfo.pWaitSemaphores = &graphics.releaseSemaphore;
+  acquireCompBufferSubmitInfo.pWaitDstStageMask = &computeAcquireWaitStage;
+   acquireCompBufferSubmitInfo.signalSemaphoreCount = 1;
+   acquireCompBufferSubmitInfo.pSignalSemaphores = &compute.acquireSemaphore;
+  //
+  
+  logicalDevice.resetFences(1, &graphics.copyFinishFence);
+  compute.queue.submit(acquireCompBufferSubmitInfo, graphics.copyFinishFence);
+  logicalDevice.waitForFences(graphics.copyFinishFence, 1, UINT64_MAX);
 }
 
-void VulkanRender::copyComputeToSwapchain(uint32_t commandBufferIndex) {
-  // TODO ..
+void VulkanRender::recordComputeCommandBuffer(vk::CommandBuffer cmdBuffer) {
+  // TODO ...
+
+  cmdBuffer.reset();
+
+  vk::CommandBufferBeginInfo beginInfo{};
+  beginInfo.sType = vk::StructureType::eCommandBufferBeginInfo;
+  cmdBuffer.begin(&beginInfo);
+
+  cmdBuffer.bindPipeline(vk::PipelineBindPoint::eCompute,
+                         compute.pipeline.pipeline);
+  cmdBuffer.bindDescriptorSets(vk::PipelineBindPoint::eCompute,
+                               compute.pipeline.layout, 0, 1,
+                               &compute.descriptorSet, 0, nullptr);
+
+  cmdBuffer.dispatch((chain.extent.width+15) / 16, (chain.extent.height+15) / 16, 1);
+  //Logger::log(Logger::LogLevel::DEBUG, "Compute");
+
+  //compute.storageImg[compute.imageUsageType::compute].transitionLayout(
+  //    compute.commandBuffer, {compute.queueIDX, graphics.queueIDX},
+  //    vk::ImageLayout::eGeneral, vk::ImageLayout::eTransferSrcOptimal,
+  //    vk::AccessFlagBits::eShaderWrite, vk::AccessFlagBits::eNone,
+  //    vk::PipelineStageFlagBits::eComputeShader,
+  //    vk::PipelineStageFlagBits::eBottomOfPipe);
+
+  compute.commandBuffer.end();
 }
+
+// void VulkanRender::prepareComputeCopy(uint32_t commandBufferIndex,
+//                                       uint32_t swapchainImageIdx) {
+//   // TODO ..
+//   vk::CommandBufferAllocateInfo allocInfo{};
+//   allocInfo.sType = vk::StructureType::eCommandBufferAllocateInfo;
+//   allocInfo.level = vk::CommandBufferLevel::ePrimary;
+//   allocInfo.commandPool = graphics.commandPool;
+//   allocInfo.commandBufferCount = 1;
+//
+//   vk::CommandBuffer commandBuffer;
+//   logicalDevice.allocateCommandBuffers(&allocInfo, &commandBuffer);
+//
+//   vk::CommandBufferBeginInfo beginInfo{};
+//   beginInfo.sType = vk::StructureType::eCommandBufferBeginInfo;
+//   beginInfo.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit;
+//
+//   commandBuffer.begin(&beginInfo);
+//
+//   compute.storageImg[commandBufferIndex].transitionLayout(
+//       commandBuffer, {compute.queueIDX, graphics.queueIDX},
+//       vk::ImageLayout::eTransferSrcOptimal,
+//       vk::ImageLayout::eTransferSrcOptimal, vk::AccessFlagBits::eNone,
+//       vk::AccessFlagBits::eTransferRead,
+//       vk::PipelineStageFlagBits::eTopOfPipe,
+//       vk::PipelineStageFlagBits::eTransfer);
+//
+//   // TODO ...
+//   // copy here
+//   //
+//
+//   compute.storageImg[commandBufferIndex].transitionLayout(
+//       commandBuffer, {graphics.queueIDX, compute.queueIDX},
+//       vk::ImageLayout::eTransferSrcOptimal, vk::ImageLayout::eGeneral,
+//       vk::AccessFlagBits::eTransferRead, vk::AccessFlagBits::eNone,
+//       vk::PipelineStageFlagBits::eTransfer,
+//       vk::PipelineStageFlagBits::eBottomOfPipe);
+//
+//   commandBuffer.end();
+//
+//   vk::SubmitInfo submitInfo{};
+//   submitInfo.sType = vk::StructureType::eSubmitInfo;
+//   submitInfo.commandBufferCount = 1;
+//   submitInfo.pCommandBuffers = &commandBuffer;
+//
+//   graphics.queue.submit(1, &submitInfo, vk::Fence{});
+//   graphics.queue.waitIdle();
+//   logicalDevice.freeCommandBuffers(graphics.commandPool, commandBuffer);
+// }
 
 void VulkanRender::createDescriptorSets() {
-
-  std::array<vk::DescriptorSetLayout, 2> layouts{compute.descriptorSetLayout,
-                                                 compute.descriptorSetLayout};
 
   vk::DescriptorSetAllocateInfo allocInfo;
   allocInfo.sType = vk::StructureType::eDescriptorSetAllocateInfo;
   allocInfo.descriptorPool = compute.descriptorPool;
-  allocInfo.descriptorSetCount = 2;
-  allocInfo.pSetLayouts = layouts.data();
+  allocInfo.descriptorSetCount = 1;
+  allocInfo.pSetLayouts = &compute.descriptorSetLayout;
 
   auto resAlloc = logicalDevice.allocateDescriptorSets(allocInfo);
   assert(resAlloc.result == vk::Result::eSuccess);
-  compute.descriptorSet = {resAlloc.value[0], resAlloc.value[1]};
+  compute.descriptorSet = resAlloc.value[0];
 
   vk::DescriptorBufferInfo uniformBufferInfo{};
   uniformBufferInfo.buffer = compute.uniformBuffer.buffer;
@@ -292,43 +589,45 @@ void VulkanRender::createDescriptorSets() {
   storageBufferInfo.range = sizeof(hitData);
 
   vk::DescriptorImageInfo imageInfoA{};
-  imageInfoA.imageView = compute.storageImg[0].view_;
-  imageInfoA.imageLayout = compute.storageImg[0].currentLayout_;
+  imageInfoA.imageView =
+      compute.storageImg[compute.imageUsageType::compute].view_;
+  imageInfoA.imageLayout =
+      compute.storageImg[compute.imageUsageType::compute].currentLayout_;
 
-  vk::DescriptorImageInfo imageInfoB{};
-  imageInfoB.imageView = compute.storageImg[1].view_;
-  imageInfoB.imageLayout = compute.storageImg[1].currentLayout_;
+  // vk::DescriptorImageInfo imageInfoB{};
+  // imageInfoB.imageView = compute.storageImg[1].view_;
+  // imageInfoB.imageLayout = compute.storageImg[1].currentLayout_;
 
-  for (int i = 0; i < 2; i++) {
+  // for (int i = 0; i < 2; i++) {
 
-    std::array<vk::WriteDescriptorSet, 3> descriptorWrites;
+  std::array<vk::WriteDescriptorSet, 3> descriptorWrites;
 
-    descriptorWrites[0].sType = vk::StructureType::eWriteDescriptorSet;
-    descriptorWrites[0].dstSet = compute.descriptorSet[i];
-    descriptorWrites[0].dstBinding = 0;
-    descriptorWrites[0].dstArrayElement = 0;
-    descriptorWrites[0].descriptorType = vk::DescriptorType::eUniformBuffer;
-    descriptorWrites[0].descriptorCount = 1;
-    descriptorWrites[0].pBufferInfo = &uniformBufferInfo;
+  descriptorWrites[0].sType = vk::StructureType::eWriteDescriptorSet;
+  descriptorWrites[0].dstSet = compute.descriptorSet;
+  descriptorWrites[0].dstBinding = 0;
+  descriptorWrites[0].dstArrayElement = 0;
+  descriptorWrites[0].descriptorType = vk::DescriptorType::eUniformBuffer;
+  descriptorWrites[0].descriptorCount = 1;
+  descriptorWrites[0].pBufferInfo = &uniformBufferInfo;
 
-    descriptorWrites[1].sType = vk::StructureType::eWriteDescriptorSet;
-    descriptorWrites[1].dstSet = compute.descriptorSet[i];
-    descriptorWrites[1].dstBinding = 1;
-    descriptorWrites[1].dstArrayElement = 0;
-    descriptorWrites[1].descriptorType = vk::DescriptorType::eStorageBuffer;
-    descriptorWrites[1].descriptorCount = 1;
-    descriptorWrites[1].pBufferInfo = &storageBufferInfo;
+  descriptorWrites[1].sType = vk::StructureType::eWriteDescriptorSet;
+  descriptorWrites[1].dstSet = compute.descriptorSet;
+  descriptorWrites[1].dstBinding = 1;
+  descriptorWrites[1].dstArrayElement = 0;
+  descriptorWrites[1].descriptorType = vk::DescriptorType::eStorageBuffer;
+  descriptorWrites[1].descriptorCount = 1;
+  descriptorWrites[1].pBufferInfo = &storageBufferInfo;
 
-    descriptorWrites[2].sType = vk::StructureType::eWriteDescriptorSet;
-    descriptorWrites[2].dstSet = compute.descriptorSet[i];
-    descriptorWrites[2].dstBinding = 2;
-    descriptorWrites[2].dstArrayElement = 0;
-    descriptorWrites[2].descriptorType = vk::DescriptorType::eStorageImage;
-    descriptorWrites[2].descriptorCount = 1;
-    descriptorWrites[2].pImageInfo = i == 0 ? &imageInfoA : &imageInfoB;
+  descriptorWrites[2].sType = vk::StructureType::eWriteDescriptorSet;
+  descriptorWrites[2].dstSet = compute.descriptorSet;
+  descriptorWrites[2].dstBinding = 2;
+  descriptorWrites[2].dstArrayElement = 0;
+  descriptorWrites[2].descriptorType = vk::DescriptorType::eStorageImage;
+  descriptorWrites[2].descriptorCount = 1;
+  descriptorWrites[2].pImageInfo = &imageInfoA;
 
-    logicalDevice.updateDescriptorSets(descriptorWrites, nullptr);
-  }
+  logicalDevice.updateDescriptorSets(descriptorWrites, nullptr);
+  //}
 }
 
 void VulkanRender::createInstance() {
@@ -339,7 +638,7 @@ void VulkanRender::createInstance() {
 
   vk::ApplicationInfo appInfo =
       vk::ApplicationInfo(this->appName, vk::enumerateInstanceVersion().value,
-                          this->appName, ENGINE_VERSION, ENGINE_VERSION);
+                          this->appName, ENGINE_VERSION, vk::ApiVersion13);
   uint32_t glfwExtensionCount = 0;
   const char **glfwExtensions;
   glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
@@ -468,6 +767,42 @@ void VulkanRender::createPhysicalDevice() {
     }
     if (isSuitable(device)) {
       physicalDevice = device;
+      auto apiVersion = prop.apiVersion;
+      uint32_t variant = VK_API_VERSION_VARIANT(apiVersion);
+      uint32_t major = VK_API_VERSION_MAJOR(apiVersion);
+      uint32_t minor = VK_API_VERSION_MINOR(apiVersion);
+      uint32_t patch = VK_API_VERSION_PATCH(apiVersion);
+
+      Logger::log(Logger::LogLevel::INFO,
+                  "USING DEVICE: " + std::string(prop.deviceName));
+      Logger::log(Logger::LogLevel::INFO, "API: " + std::to_string(major) +
+                                              "." + std::to_string(minor) +
+                                              "." + std::to_string(patch) +
+                                              "." + std::to_string(variant));
+
+      VkPhysicalDeviceDriverProperties driverProps = {};
+      driverProps.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DRIVER_PROPERTIES;
+
+      VkPhysicalDeviceProperties2 props2 = {};
+      props2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
+      props2.pNext = &driverProps;
+
+      vkGetPhysicalDeviceProperties2(physicalDevice, &props2);
+
+      Logger::log(Logger::LogLevel::INFO,
+                  "Driver: " + std::string(driverProps.driverInfo));
+
+      uint32_t maxInvocations = prop.limits.maxComputeWorkGroupInvocations;
+      VkExtent3D maxSize = {prop.limits.maxComputeWorkGroupSize[0],
+                            prop.limits.maxComputeWorkGroupSize[1],
+                            prop.limits.maxComputeWorkGroupSize[2]};
+      Logger::log(Logger::LogLevel::DEBUG,
+                  "Max invocations: " + std::to_string(maxInvocations));
+      Logger::log(Logger::LogLevel::DEBUG,
+                  "X: " + std::to_string(maxSize.width) + " | " +
+                      "Y: " + std::to_string(maxSize.height) + " | " +
+                      "Z: " + std::to_string(maxSize.depth));
+
       break;
     }
   }
@@ -674,7 +1009,10 @@ void VulkanRender::createLogicalDevice() {
   logicalDevice = vk::Device(deviceHandle);
 
   graphics.queue = logicalDevice.getQueue(graphicsIndex, 0);
+  graphics.queueIDX = graphicsIndex;
   compute.queue = logicalDevice.getQueue(computeIndex, 0);
+  compute.queueIDX = computeIndex;
+
   deviceGlobalGarbageQueue.push_back(
       [](vk::Device device) { device.destroy(); });
 }
@@ -694,15 +1032,66 @@ void VulkanRender::createSwapChain() {
   chain.create(logicalDevice, physicalDevice, surface, width, height);
 }
 
+void VulkanRender::buildSwapchainImages() {
+  chain.build(renderPass);
+
+  vk::CommandBufferAllocateInfo allocInfo{};
+  allocInfo.sType = vk::StructureType::eCommandBufferAllocateInfo;
+  allocInfo.level = vk::CommandBufferLevel::ePrimary;
+  allocInfo.commandPool = graphics.commandPool;
+  allocInfo.commandBufferCount = 1;
+
+  vk::CommandBuffer commandBuffer;
+  logicalDevice.allocateCommandBuffers(&allocInfo, &commandBuffer);
+
+  vk::CommandBufferBeginInfo beginInfo{};
+  beginInfo.sType = vk::StructureType::eCommandBufferBeginInfo;
+  beginInfo.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit;
+
+  commandBuffer.begin(&beginInfo);
+
+  for (Frame &f : chain.frames) {
+    vk::ImageMemoryBarrier barrier{};
+    barrier.oldLayout = vk::ImageLayout::eUndefined;
+    barrier.newLayout = vk::ImageLayout::ePresentSrcKHR;
+    barrier.srcQueueFamilyIndex = vk::QueueFamilyIgnored;
+    barrier.dstQueueFamilyIndex = vk::QueueFamilyIgnored;
+    barrier.srcAccessMask = vk::AccessFlagBits::eNone;
+    barrier.dstAccessMask = vk::AccessFlagBits::eNone;
+    barrier.image = f.image;
+    barrier.subresourceRange.aspectMask = vk::ImageAspectFlagBits::eColor;
+    barrier.subresourceRange.baseMipLevel = 0;
+    barrier.subresourceRange.levelCount = 1;
+    barrier.subresourceRange.baseArrayLayer = 0;
+    barrier.subresourceRange.layerCount = 1;
+
+    commandBuffer.pipelineBarrier(
+        vk::PipelineStageFlagBits::eTopOfPipe, // Adjust as needed
+        vk::PipelineStageFlagBits::eBottomOfPipe, vk::DependencyFlags(),
+        nullptr, nullptr, barrier);
+  }
+
+  commandBuffer.end();
+
+  vk::SubmitInfo submitInfo{};
+  submitInfo.sType = vk::StructureType::eSubmitInfo;
+  submitInfo.commandBufferCount = 1;
+  submitInfo.pCommandBuffers = &commandBuffer;
+
+  graphics.queue.submit(1, &submitInfo, vk::Fence{});
+  graphics.queue.waitIdle();
+  logicalDevice.freeCommandBuffers(graphics.commandPool, commandBuffer);
+}
+
 void VulkanRender::buildRenderPass() {
   vk::AttachmentDescription colorAttachment{};
   colorAttachment.format = chain.format.format;
   colorAttachment.samples = vk::SampleCountFlagBits::e1;
-  colorAttachment.loadOp = vk::AttachmentLoadOp::eClear;
+  colorAttachment.loadOp = vk::AttachmentLoadOp::eLoad;
   colorAttachment.storeOp = vk::AttachmentStoreOp::eStore;
   colorAttachment.stencilLoadOp = vk::AttachmentLoadOp::eDontCare;
   colorAttachment.stencilStoreOp = vk::AttachmentStoreOp::eDontCare;
-  colorAttachment.initialLayout = vk::ImageLayout::eUndefined;
+  colorAttachment.initialLayout = vk::ImageLayout::ePresentSrcKHR;
   colorAttachment.finalLayout = vk::ImageLayout::ePresentSrcKHR;
 
   vk::AttachmentReference colorAttachmentRef{};
@@ -786,23 +1175,135 @@ void VulkanRender::createCommandBuffers() {
   allocInfo.commandBufferCount =
       static_cast<uint32_t>(graphics.commandBuffer.size());
 
-  auto res = logicalDevice.allocateCommandBuffers(
-      &allocInfo, graphics.commandBuffer.data());
-  assert(res == vk::Result::eSuccess);
+  assert(logicalDevice.allocateCommandBuffers(&allocInfo,
+                                              graphics.commandBuffer.data()) ==
+         vk::Result::eSuccess);
 
-  // TODO crete compute cmd buffer
+  vk::CommandBufferAllocateInfo computeAllocInfo{};
+  computeAllocInfo.sType = vk::StructureType::eCommandBufferAllocateInfo;
+  computeAllocInfo.commandPool = compute.commandPool;
+  computeAllocInfo.level = vk::CommandBufferLevel::ePrimary;
+  computeAllocInfo.commandBufferCount = 1;
+
+  assert(logicalDevice.allocateCommandBuffers(&computeAllocInfo,
+                                              &compute.commandBuffer) ==
+         vk::Result::eSuccess);
+
+  vk::CommandBufferAllocateInfo compBufferAllocInfo{};
+  compBufferAllocInfo.sType = vk::StructureType::eCommandBufferAllocateInfo;
+  compBufferAllocInfo.commandBufferCount = 2;
+  compBufferAllocInfo.commandPool = compute.commandPool;
+  compBufferAllocInfo.level = vk::CommandBufferLevel::ePrimary;
+
+  std::array<vk::CommandBuffer, 2> computeTransitionCmdBuffers;
+
+  assert(logicalDevice.allocateCommandBuffers(
+             &compBufferAllocInfo, computeTransitionCmdBuffers.data()) ==
+         vk::Result::eSuccess);
+
+  compute.acquireBuffer = computeTransitionCmdBuffers[0];
+  compute.releaseBuffer = computeTransitionCmdBuffers[1];
+
+  vk::CommandBufferAllocateInfo graphBufferAllocInfo{};
+  graphBufferAllocInfo.sType = vk::StructureType::eCommandBufferAllocateInfo;
+  graphBufferAllocInfo.commandBufferCount = 3;
+  graphBufferAllocInfo.commandPool = graphics.commandPool;
+  graphBufferAllocInfo.level = vk::CommandBufferLevel::ePrimary;
+
+  std::array<vk::CommandBuffer, 3> graphicTransitionCmdBuffers;
+
+  assert(logicalDevice.allocateCommandBuffers(
+             &graphBufferAllocInfo, graphicTransitionCmdBuffers.data()) ==
+         vk::Result::eSuccess);
+
+  graphics.acquireBuffer = graphicTransitionCmdBuffers[0];
+  graphics.releaseBuffer = graphicTransitionCmdBuffers[1];
+  graphics.copyBuffer = graphicTransitionCmdBuffers[2];
+}
+
+void VulkanRender::fromSwapchainToTransfer(vk::CommandBuffer commandBuffer,
+                                           vk::Image img) {
+  vk::ImageMemoryBarrier barrierSwapTransfer{};
+  barrierSwapTransfer.image = img;
+  barrierSwapTransfer.oldLayout = vk::ImageLayout::ePresentSrcKHR;
+  barrierSwapTransfer.newLayout = vk::ImageLayout::eTransferDstOptimal;
+  barrierSwapTransfer.srcQueueFamilyIndex = graphics.queueIDX;
+  barrierSwapTransfer.dstQueueFamilyIndex = graphics.queueIDX;
+  barrierSwapTransfer.subresourceRange = {vk::ImageAspectFlagBits::eColor, 0, 1,
+                                          0, 1};
+  barrierSwapTransfer.dstAccessMask = vk::AccessFlagBits::eTransferWrite;
+  barrierSwapTransfer.srcAccessMask = vk::AccessFlagBits::eNone;
+
+  commandBuffer.pipelineBarrier(vk::PipelineStageFlagBits::eTopOfPipe,
+                                vk::PipelineStageFlagBits::eTransfer, {}, 0,
+                                nullptr, 0, nullptr, 1, &barrierSwapTransfer);
+
+  // compute.storageImg[1].transitionLayout(
+  //     commandBuffer, {graphics.queueIDX, graphics.queueIDX},
+  //     vk::ImageLayout::eGeneral, vk::ImageLayout::eTransferSrcOptimal,
+  //     vk::AccessFlagBits::eShaderWrite, vk::AccessFlagBits::eNone,
+  //     vk::PipelineStageFlagBits::eComputeShader,
+  //     vk::PipelineStageFlagBits::eBottomOfPipe);
+}
+
+void VulkanRender::fromTransferToSwapchain(vk::CommandBuffer commandBuffer,
+                                           vk::Image img) {
+  vk::ImageMemoryBarrier barrierSwapPresent{};
+  barrierSwapPresent.image = img;
+  barrierSwapPresent.oldLayout = vk::ImageLayout::eTransferDstOptimal;
+  barrierSwapPresent.newLayout = vk::ImageLayout::ePresentSrcKHR;
+  barrierSwapPresent.srcQueueFamilyIndex = graphics.queueIDX;
+  barrierSwapPresent.dstQueueFamilyIndex = graphics.queueIDX;
+  barrierSwapPresent.subresourceRange = {vk::ImageAspectFlagBits::eColor, 0, 1,
+                                         0, 1};
+  barrierSwapPresent.srcAccessMask = vk::AccessFlagBits::eTransferWrite;
+  barrierSwapPresent.dstAccessMask = vk::AccessFlagBits::eNone;
+
+  commandBuffer.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer,
+                                vk::PipelineStageFlagBits::eBottomOfPipe, {}, 0,
+                                nullptr, 0, nullptr, 1, &barrierSwapPresent);
+
+  // compute.storageImg[compute.imageUsageType::display].transitionLayout(
+  //     commandBuffer, {graphics.queueIDX, graphics.queueIDX},
+  //     vk::ImageLayout::eTransferSrcOptimal, vk::ImageLayout::eGeneral,
+  //     vk::AccessFlagBits::eNone, vk::AccessFlagBits::eShaderWrite,
+  //     vk::PipelineStageFlagBits::eBottomOfPipe,
+  //     vk::PipelineStageFlagBits::eComputeShader);
 }
 
 void VulkanRender::recordGraphicCommandBuffer(vk::CommandBuffer commandBuffer,
                                               uint32_t imageIndex) {
+  // TODO include ACQUIRE AND RELEASE BARRIES, CHANGED THE SOURCE AND DST QUEUE
+  // IN TRANSITION LAYOUT
   vk::CommandBufferBeginInfo beginInfo{};
   beginInfo.sType = vk::StructureType::eCommandBufferBeginInfo;
   beginInfo.pInheritanceInfo = nullptr;
 
-  auto res = commandBuffer.begin(&beginInfo);
-  if (res != vk::Result::eSuccess) {
-    throw std::runtime_error("Failed to begin cmdBuffer");
-  }
+  assert(commandBuffer.begin(&beginInfo) == vk::Result::eSuccess);
+
+  fromSwapchainToTransfer(commandBuffer, chain.frames[imageIndex].image);
+
+  vk::ImageCopy copyRegion{};
+  copyRegion.srcOffset = vk::Offset3D(0, 0, 0);
+  copyRegion.srcSubresource.baseArrayLayer = 0;
+  copyRegion.srcSubresource.layerCount = 1;
+  copyRegion.srcSubresource.mipLevel = 0;
+  copyRegion.srcSubresource.aspectMask = vk::ImageAspectFlagBits::eColor;
+
+  copyRegion.dstOffset = vk::Offset3D(0, 0, 0);
+  copyRegion.dstSubresource.baseArrayLayer = 0;
+  copyRegion.dstSubresource.layerCount = 1;
+  copyRegion.dstSubresource.mipLevel = 0;
+  copyRegion.dstSubresource.aspectMask = vk::ImageAspectFlagBits::eColor;
+
+  copyRegion.extent = {{chain.extent.width, chain.extent.height, 1}};
+
+  commandBuffer.copyImage(
+      compute.storageImg[compute.imageUsageType::display].image_,
+      vk::ImageLayout::eTransferSrcOptimal, chain.frames[imageIndex].image,
+      vk::ImageLayout::eTransferDstOptimal, 1, &copyRegion);
+
+  fromTransferToSwapchain(commandBuffer, chain.frames[imageIndex].image);
 
   vk::ClearColorValue clearValColor = {57.f / 255.f, 62.f / 255.f, 70.f / 255.f,
                                        1.f};
@@ -872,11 +1373,9 @@ void VulkanRender::createSyncObjects() {
     auto resImgAvl = logicalDevice.createSemaphore(semaphoreInfo);
     auto resRendFin = logicalDevice.createSemaphore(semaphoreInfo);
     auto resFen = logicalDevice.createFence(fenceInfo);
-    if (resImgAvl.result != vk::Result::eSuccess ||
-        resRendFin.result != vk::Result::eSuccess ||
-        resFen.result != vk::Result::eSuccess) {
-      throw std::runtime_error("Failed to create synchronization objects");
-    }
+    assert(resImgAvl.result == vk::Result::eSuccess &&
+           resRendFin.result == vk::Result::eSuccess &&
+           resFen.result == vk::Result::eSuccess);
 
     imageAvailableSemaphores[i] = resImgAvl.value;
     renderFinishedSemaphores[i] = resRendFin.value;
@@ -893,23 +1392,52 @@ void VulkanRender::createSyncObjects() {
 
   vk::FenceCreateInfo fenceInfoCompute{};
   fenceInfoCompute.sType = vk::StructureType::eFenceCreateInfo;
-  for (int i = 0; i < 2; i++) {
-    auto rescf = logicalDevice.createFence(fenceInfoCompute);
-    assert(rescf.result == vk::Result::eSuccess);
-    compute.computeFences[i] = rescf.value;
-  }
+  fenceInfoCompute.flags = vk::FenceCreateFlagBits::eSignaled;
+  auto rescf = logicalDevice.createFence(fenceInfoCompute);
+  assert(rescf.result == vk::Result::eSuccess);
+  compute.computeFence = rescf.value;
+
   vk::SemaphoreCreateInfo semaphoreInfoCompute{};
   semaphoreInfoCompute.sType = vk::StructureType::eSemaphoreCreateInfo;
 
-  auto rescs = logicalDevice.createSemaphore(semaphoreInfoCompute);
-  assert(rescs.result == vk::Result::eSuccess);
-  compute.computeFinishedSemaphore = rescs.value;
+  vk::FenceCreateInfo fenceCopyInfo{};
+  fenceCopyInfo.sType = vk::StructureType::eFenceCreateInfo;
+
+  auto semCompFin = logicalDevice.createSemaphore(semaphoreInfoCompute);
+  auto semGraphAcquire = logicalDevice.createSemaphore(semaphoreInfoCompute);
+  auto semCompAcquire = logicalDevice.createSemaphore(semaphoreInfoCompute);
+  auto semGraphRelease = logicalDevice.createSemaphore(semaphoreInfoCompute);
+  auto semCompRelease = logicalDevice.createSemaphore(semaphoreInfoCompute);
+  auto semGraphCopy = logicalDevice.createSemaphore(semaphoreInfoCompute);
+  auto fenGraphCopy = logicalDevice.createFence(fenceCopyInfo);
+  assert(semCompFin.result == vk::Result::eSuccess &&
+         semGraphAcquire.result == vk::Result::eSuccess &&
+         semCompAcquire.result == vk::Result::eSuccess &&
+         semGraphRelease.result == vk::Result::eSuccess &&
+         semCompRelease.result == vk::Result::eSuccess &&
+         semGraphCopy.result == vk::Result::eSuccess &&
+         fenGraphCopy.result == vk::Result::eSuccess
+
+  );
+  compute.computeFinishedSemaphore = semCompFin.value;
+
+  compute.acquireSemaphore = semCompAcquire.value;
+  compute.releaseSemaphore = semCompRelease.value;
+  graphics.acquireSemaphore = semGraphAcquire.value;
+  graphics.releaseSemaphore = semGraphRelease.value;
+
+  graphics.copySemaphore = semGraphCopy.value;
+  graphics.copyFinishFence = fenGraphCopy.value;
 
   deviceGlobalGarbageQueue.push_back([this](vk::Device device) {
-    for (int i = 0; i < 2; i++) {
-      device.destroyFence(compute.computeFences[i]);
-    }
+    device.destroyFence(compute.computeFence);
     device.destroySemaphore(compute.computeFinishedSemaphore);
+    device.destroySemaphore(compute.acquireSemaphore);
+    device.destroySemaphore(graphics.acquireSemaphore);
+    device.destroySemaphore(compute.releaseSemaphore);
+    device.destroySemaphore(graphics.releaseSemaphore);
+    device.destroySemaphore(graphics.copySemaphore);
+    device.destroyFence(graphics.copyFinishFence);
   });
 }
 
@@ -957,13 +1485,15 @@ void VulkanRender::createDescriptorSetLayout() {
 
 void VulkanRender::createPipeline() {
 
-  std::array<vk::DescriptorSetLayout, 2> layouts{compute.descriptorSetLayout,
-                                                 compute.descriptorSetLayout};
-
-  vk::PipelineLayoutCreateInfo computeLayoutCreateInfo{};
-  computeLayoutCreateInfo.sType = vk::StructureType::ePipelineLayoutCreateInfo;
-  computeLayoutCreateInfo.setLayoutCount = 2;
-  computeLayoutCreateInfo.pSetLayouts = layouts.data();
+  //  std::array<vk::DescriptorSetLayout, 2>
+  //  layouts{compute.descriptorSetLayout,
+  //                                                 compute.descriptorSetLayout};
+  //
+  //  vk::PipelineLayoutCreateInfo computeLayoutCreateInfo{};
+  //  computeLayoutCreateInfo.sType =
+  //  vk::StructureType::ePipelineLayoutCreateInfo;
+  //  computeLayoutCreateInfo.setLayoutCount = 1;
+  //  computeLayoutCreateInfo.pSetLayouts = layouts.data();
   compute.pipeline.createPipeline(logicalDevice, "pathTracer.comp.spv",
                                   compute.descriptorSetLayout,
                                   deviceGlobalGarbageQueue);
@@ -973,19 +1503,19 @@ void VulkanRender::createDescriptorPool() {
   std::array<vk::DescriptorPoolSize, 3> poolSizes = {};
 
   poolSizes[0].type = vk::DescriptorType::eUniformBuffer;
-  poolSizes[0].descriptorCount = 2;
+  poolSizes[0].descriptorCount = 1;
 
   poolSizes[1].type = vk::DescriptorType::eStorageBuffer;
-  poolSizes[1].descriptorCount = 2;
+  poolSizes[1].descriptorCount = 1;
 
   poolSizes[2].type = vk::DescriptorType::eStorageImage;
-  poolSizes[2].descriptorCount = 2;
+  poolSizes[2].descriptorCount = 1;
 
   vk::DescriptorPoolCreateInfo poolInfo{};
   poolInfo.sType = vk::StructureType::eDescriptorPoolCreateInfo;
   poolInfo.poolSizeCount = poolSizes.size();
   poolInfo.pPoolSizes = poolSizes.data();
-  poolInfo.maxSets = 2;
+  poolInfo.maxSets = 1;
 
   auto res = logicalDevice.createDescriptorPool(poolInfo);
   assert(res.result == vk::Result::eSuccess);

@@ -6,6 +6,7 @@ meshFiles/*
 
 # Build folder
 build/*
+build*/
 
 # Clangd cache
 .cache/*

@@ -27,6 +27,14 @@ public:
    */
   void build(vk::RenderPass renderPass);
 
+/**
+ * @brief Transition layout from undefined to present
+ * @param img Image to be transitioned
+ *
+ * details Might become obsolete after a image superclass creation
+ */
+  void adjustLayout(vk::Image img);
+
   /**
    * @brief Create frameBuffers
    */
