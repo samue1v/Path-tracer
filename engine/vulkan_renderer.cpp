@@ -238,28 +238,29 @@ void VulkanRender::drawFrame() {
   showPerformanceMenu();
   showMenu();
 
-   if (logicalDevice.getFenceStatus(compute.computeFence) ==
-       vk::Result::eSuccess) {
-     // Logger::log(Logger::LogLevel::DEBUG,
-     //             "Compute Fence done for buffer number " +
-     //                 std::to_string(compute.currentComputeBuffer));
-     logicalDevice.resetFences(1, &compute.computeFence);
-     swapComputePresentImages();
-     recordComputeCommandBuffer(compute.commandBuffer);
+  if (logicalDevice.getFenceStatus(compute.computeFence) ==
+      vk::Result::eSuccess) {
+    // Logger::log(Logger::LogLevel::DEBUG,
+    //             "Compute Fence done for buffer number " +
+    //                 std::to_string(compute.currentComputeBuffer));
+    logicalDevice.resetFences(1, &compute.computeFence);
+    swapComputePresentImages();
+    recordComputeCommandBuffer(compute.commandBuffer);
 
-     vk::PipelineStageFlags waitStageCompute = vk::PipelineStageFlagBits::eTransfer;
+    vk::PipelineStageFlags waitStageCompute =
+        vk::PipelineStageFlagBits::eTransfer;
     vk::SubmitInfo submitInfo{};
     submitInfo.sType = vk::StructureType::eSubmitInfo;
     submitInfo.commandBufferCount = 1;
     submitInfo.pCommandBuffers = &compute.commandBuffer;
-    //submitInfo.signalSemaphoreCount = 1;
-    //submitInfo.pSignalSemaphores = &compute.computeFinishedSemaphore;
+    // submitInfo.signalSemaphoreCount = 1;
+    // submitInfo.pSignalSemaphores = &compute.computeFinishedSemaphore;
     submitInfo.waitSemaphoreCount = 1;
     submitInfo.pWaitSemaphores = &compute.acquireSemaphore;
     submitInfo.pWaitDstStageMask = &waitStageCompute;
 
     compute.queue.submit(1, &submitInfo, compute.computeFence);
-    //logicalDevice.waitForFences(1,&compute.computeFence,1, UINT64_MAX);
+    // logicalDevice.waitForFences(1,&compute.computeFence,1, UINT64_MAX);
   }
 
   graphics.commandBuffer[currentFrame].reset();
@@ -320,7 +321,8 @@ void VulkanRender::swapComputePresentImages() {
 
   vk::CommandBufferBeginInfo beginInfo{};
   beginInfo.sType = vk::StructureType::eCommandBufferBeginInfo;
-  assert(compute.releaseBuffer.begin(&beginInfo) == vk::Result::eSuccess);
+  auto res = compute.releaseBuffer.begin(&beginInfo);
+  assert(res == vk::Result::eSuccess);
 
   // Transition compute image from GENERAL to TRANSFERSRC
   compute.storageImg[compute.imageUsageType::compute].transitionLayout(
@@ -480,10 +482,10 @@ void VulkanRender::swapComputePresentImages() {
   acquireCompBufferSubmitInfo.waitSemaphoreCount = 1;
   acquireCompBufferSubmitInfo.pWaitSemaphores = &graphics.releaseSemaphore;
   acquireCompBufferSubmitInfo.pWaitDstStageMask = &computeAcquireWaitStage;
-   acquireCompBufferSubmitInfo.signalSemaphoreCount = 1;
-   acquireCompBufferSubmitInfo.pSignalSemaphores = &compute.acquireSemaphore;
+  acquireCompBufferSubmitInfo.signalSemaphoreCount = 1;
+  acquireCompBufferSubmitInfo.pSignalSemaphores = &compute.acquireSemaphore;
   //
-  
+
   logicalDevice.resetFences(1, &graphics.copyFinishFence);
   compute.queue.submit(acquireCompBufferSubmitInfo, graphics.copyFinishFence);
   logicalDevice.waitForFences(graphics.copyFinishFence, 1, UINT64_MAX);
@@ -504,15 +506,16 @@ void VulkanRender::recordComputeCommandBuffer(vk::CommandBuffer cmdBuffer) {
                                compute.pipeline.layout, 0, 1,
                                &compute.descriptorSet, 0, nullptr);
 
-  cmdBuffer.dispatch((chain.extent.width+15) / 16, (chain.extent.height+15) / 16, 1);
-  //Logger::log(Logger::LogLevel::DEBUG, "Compute");
+  cmdBuffer.dispatch((chain.extent.width + 15) / 16,
+                     (chain.extent.height + 15) / 16, 1);
+  // Logger::log(Logger::LogLevel::DEBUG, "Compute");
 
-  //compute.storageImg[compute.imageUsageType::compute].transitionLayout(
-  //    compute.commandBuffer, {compute.queueIDX, graphics.queueIDX},
-  //    vk::ImageLayout::eGeneral, vk::ImageLayout::eTransferSrcOptimal,
-  //    vk::AccessFlagBits::eShaderWrite, vk::AccessFlagBits::eNone,
-  //    vk::PipelineStageFlagBits::eComputeShader,
-  //    vk::PipelineStageFlagBits::eBottomOfPipe);
+  // compute.storageImg[compute.imageUsageType::compute].transitionLayout(
+  //     compute.commandBuffer, {compute.queueIDX, graphics.queueIDX},
+  //     vk::ImageLayout::eGeneral, vk::ImageLayout::eTransferSrcOptimal,
+  //     vk::AccessFlagBits::eShaderWrite, vk::AccessFlagBits::eNone,
+  //     vk::PipelineStageFlagBits::eComputeShader,
+  //     vk::PipelineStageFlagBits::eBottomOfPipe);
 
   compute.commandBuffer.end();
 }
@@ -638,7 +641,7 @@ void VulkanRender::createInstance() {
 
   vk::ApplicationInfo appInfo =
       vk::ApplicationInfo(this->appName, vk::enumerateInstanceVersion().value,
-                          this->appName, ENGINE_VERSION, vk::ApiVersion13);
+                          this->appName, ENGINE_VERSION, vk::ApiVersion10);
   uint32_t glfwExtensionCount = 0;
   const char **glfwExtensions;
   glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
@@ -760,8 +763,8 @@ void VulkanRender::createPhysicalDevice() {
       instance.enumeratePhysicalDevices().value;
   VkPhysicalDeviceProperties prop;
   for (vk::PhysicalDevice device : availableDevices) {
+    vkGetPhysicalDeviceProperties(device, &prop);
     if (enableValidationLayers) {
-      vkGetPhysicalDeviceProperties(device, &prop);
       Logger::log(Logger::LogLevel::DEBUG,
                   "DEVICE: " + std::string(prop.deviceName));
     }
@@ -780,28 +783,29 @@ void VulkanRender::createPhysicalDevice() {
                                               "." + std::to_string(patch) +
                                               "." + std::to_string(variant));
 
-      VkPhysicalDeviceDriverProperties driverProps = {};
-      driverProps.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DRIVER_PROPERTIES;
+       VkPhysicalDeviceDriverProperties driverProps = {};
+       driverProps.sType =
+       VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DRIVER_PROPERTIES;
 
-      VkPhysicalDeviceProperties2 props2 = {};
-      props2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
-      props2.pNext = &driverProps;
+       VkPhysicalDeviceProperties2 props2 = {};
+       props2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
+       props2.pNext = &driverProps;
 
-      vkGetPhysicalDeviceProperties2(physicalDevice, &props2);
+       vkGetPhysicalDeviceProperties2(physicalDevice, &props2);
 
-      Logger::log(Logger::LogLevel::INFO,
-                  "Driver: " + std::string(driverProps.driverInfo));
+       Logger::log(Logger::LogLevel::INFO,
+                   "Driver: " + std::string(driverProps.driverInfo));
 
-      uint32_t maxInvocations = prop.limits.maxComputeWorkGroupInvocations;
-      VkExtent3D maxSize = {prop.limits.maxComputeWorkGroupSize[0],
-                            prop.limits.maxComputeWorkGroupSize[1],
-                            prop.limits.maxComputeWorkGroupSize[2]};
-      Logger::log(Logger::LogLevel::DEBUG,
-                  "Max invocations: " + std::to_string(maxInvocations));
-      Logger::log(Logger::LogLevel::DEBUG,
-                  "X: " + std::to_string(maxSize.width) + " | " +
-                      "Y: " + std::to_string(maxSize.height) + " | " +
-                      "Z: " + std::to_string(maxSize.depth));
+       uint32_t maxInvocations = prop.limits.maxComputeWorkGroupInvocations;
+       VkExtent3D maxSize = {prop.limits.maxComputeWorkGroupSize[0],
+                             prop.limits.maxComputeWorkGroupSize[1],
+                             prop.limits.maxComputeWorkGroupSize[2]};
+       Logger::log(Logger::LogLevel::DEBUG,
+                   "Max invocations: " + std::to_string(maxInvocations));
+       Logger::log(Logger::LogLevel::DEBUG,
+                   "X: " + std::to_string(maxSize.width) + " | " +
+                       "Y: " + std::to_string(maxSize.height) + " | " +
+                       "Z: " + std::to_string(maxSize.depth));
 
       break;
     }
@@ -1175,9 +1179,9 @@ void VulkanRender::createCommandBuffers() {
   allocInfo.commandBufferCount =
       static_cast<uint32_t>(graphics.commandBuffer.size());
 
-  assert(logicalDevice.allocateCommandBuffers(&allocInfo,
-                                              graphics.commandBuffer.data()) ==
-         vk::Result::eSuccess);
+  auto resGraph = logicalDevice.allocateCommandBuffers(
+      &allocInfo, graphics.commandBuffer.data());
+  assert(resGraph == vk::Result::eSuccess);
 
   vk::CommandBufferAllocateInfo computeAllocInfo{};
   computeAllocInfo.sType = vk::StructureType::eCommandBufferAllocateInfo;
@@ -1185,9 +1189,9 @@ void VulkanRender::createCommandBuffers() {
   computeAllocInfo.level = vk::CommandBufferLevel::ePrimary;
   computeAllocInfo.commandBufferCount = 1;
 
-  assert(logicalDevice.allocateCommandBuffers(&computeAllocInfo,
-                                              &compute.commandBuffer) ==
-         vk::Result::eSuccess);
+  auto resComp = logicalDevice.allocateCommandBuffers(&computeAllocInfo,
+                                                      &compute.commandBuffer);
+  assert(resComp == vk::Result::eSuccess);
 
   vk::CommandBufferAllocateInfo compBufferAllocInfo{};
   compBufferAllocInfo.sType = vk::StructureType::eCommandBufferAllocateInfo;
@@ -1197,9 +1201,9 @@ void VulkanRender::createCommandBuffers() {
 
   std::array<vk::CommandBuffer, 2> computeTransitionCmdBuffers;
 
-  assert(logicalDevice.allocateCommandBuffers(
-             &compBufferAllocInfo, computeTransitionCmdBuffers.data()) ==
-         vk::Result::eSuccess);
+  auto resCompTrans = logicalDevice.allocateCommandBuffers(
+      &compBufferAllocInfo, computeTransitionCmdBuffers.data());
+  assert(resCompTrans == vk::Result::eSuccess);
 
   compute.acquireBuffer = computeTransitionCmdBuffers[0];
   compute.releaseBuffer = computeTransitionCmdBuffers[1];
@@ -1212,9 +1216,9 @@ void VulkanRender::createCommandBuffers() {
 
   std::array<vk::CommandBuffer, 3> graphicTransitionCmdBuffers;
 
-  assert(logicalDevice.allocateCommandBuffers(
-             &graphBufferAllocInfo, graphicTransitionCmdBuffers.data()) ==
-         vk::Result::eSuccess);
+  auto resGraphTrans = logicalDevice.allocateCommandBuffers(
+      &graphBufferAllocInfo, graphicTransitionCmdBuffers.data());
+  assert(resGraphTrans == vk::Result::eSuccess);
 
   graphics.acquireBuffer = graphicTransitionCmdBuffers[0];
   graphics.releaseBuffer = graphicTransitionCmdBuffers[1];
@@ -1279,7 +1283,8 @@ void VulkanRender::recordGraphicCommandBuffer(vk::CommandBuffer commandBuffer,
   beginInfo.sType = vk::StructureType::eCommandBufferBeginInfo;
   beginInfo.pInheritanceInfo = nullptr;
 
-  assert(commandBuffer.begin(&beginInfo) == vk::Result::eSuccess);
+  auto resCmdBegin = commandBuffer.begin(&beginInfo);
+  assert(resCmdBegin == vk::Result::eSuccess);
 
   fromSwapchainToTransfer(commandBuffer, chain.frames[imageIndex].image);
 

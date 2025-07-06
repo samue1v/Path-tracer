@@ -2,7 +2,7 @@
 #define CONFIG_HPP
 
 #ifdef NDEBUG
-constexpr bool enableValidationLayers = true;
+constexpr bool enableValidationLayers = false;
 #pragma message("NDEBUG is defined: Release build")
 #else
 

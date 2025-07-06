@@ -19,7 +19,7 @@ Logger & Logger::getInstance(){
 }
 
 void Logger::log(LogLevel lvl, std::string message) {
-  if (!enableValidationLayers) {
+  if (!enableValidationLayers && lvl == LogLevel::DEBUG) {
     return;
   }
 
@@ -30,7 +30,7 @@ void Logger::log(LogLevel lvl, std::string message) {
 }
 
 void Logger::log(LogLevel lvl, std::vector<std::string> messages) {
-  if (!enableValidationLayers) {
+  if (!enableValidationLayers && lvl == LogLevel::DEBUG) {
     return;
   }
   std::string colorCode, levelStr;

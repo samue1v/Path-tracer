@@ -7,6 +7,8 @@ meshFiles/*
 # Build folder
 build/*
 build*/
+debug_build/*
+release_build/*
 
 # Clangd cache
 .cache/*
@@ -16,3 +18,6 @@ build*/
 
 # IMGUI init file
 imgui.ini
+
+# Compiled shaders
+shaders/compiled/*
