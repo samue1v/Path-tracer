@@ -3,10 +3,10 @@
 
 #ifdef NDEBUG
 constexpr bool enableValidationLayers = false;
-#pragma message("NDEBUG is defined: Release build")
+//#pragma message("NDEBUG is defined: Release build")
 #else
 
 constexpr bool enableValidationLayers = true;
-#pragma message("NDEBUG NOT defined: Debug build")
+#pragma once message("NDEBUG NOT defined: Debug build")
 #endif
 #endif

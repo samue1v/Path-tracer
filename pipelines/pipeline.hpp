@@ -19,7 +19,7 @@ public:
   void
   createPipeline(vk::Device device, const char *vertShaderPath,
                  const char *fragShaderPath, vk::RenderPass renderPass,
-                 vk::DescriptorSetLayout descriptorLayout,
+                 vk::DescriptorSetLayout descriptorLayout, vk::PushConstantRange pushConstantRange,
                  std::deque<std::function<void(vk::Device)>> &deletionQueue);
 
   /**
@@ -27,7 +27,7 @@ public:
    */
   void
   createPipeline(vk::Device device, const char *shaderPath,
-                 vk::DescriptorSetLayout descriptorLayout,
+                 vk::DescriptorSetLayout descriptorLayout,vk::PushConstantRange pushConstantRange,
                  std::deque<std::function<void(vk::Device)>> &deletionQueue);
 
   ~Pipeline() = default;
@@ -43,7 +43,7 @@ private:
   void
   buildPipeline(vk::Device device, const char *vertShaderPath,
                 const char *fragShaderPath, vk::RenderPass renderPass,
-                vk::DescriptorSetLayout descriptorLayout,
+                vk::DescriptorSetLayout descriptorLayout,vk::PushConstantRange pushConstantRange,
                 std::deque<std::function<void(vk::Device)>> &deletionQueue);
 
   /**
@@ -54,7 +54,7 @@ private:
    */
   void
   buildPipeline(vk::Device device, const char *shaderPath,
-                vk::DescriptorSetLayout descriptorLayout,
+                vk::DescriptorSetLayout descriptorLayout,vk::PushConstantRange pushConstantRange,
                 std::deque<std::function<void(vk::Device)>> &deletionQueue);
 
   /**

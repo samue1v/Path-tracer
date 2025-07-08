@@ -12,6 +12,7 @@ release_build/*
 
 # Clangd cache
 .cache/*
+.clangd
 
 # Clangd ignore file
 .ignore
@@ -21,3 +22,5 @@ imgui.ini
 
 # Compiled shaders
 shaders/compiled/*
+
+compile_commands.json

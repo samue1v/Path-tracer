@@ -14,6 +14,10 @@
 #include <queue>
 #include <vector>
 
+#include <chrono>
+#include <ctime>
+#include <iomanip>
+
 #include "Buffer.hpp"
 #include "Logger.hpp"
 #include "ResourceImage.hpp"
@@ -21,36 +25,13 @@
 #include "objLoader.hpp"
 #include "simpleMesh.hpp"
 #include "swapchain.hpp"
+#include "tracer.hpp"
 
 #include "pipeline.hpp"
 #include <vk_mem_alloc.h>
 
 #define ENGINE_VERSION VK_MAKE_API_VERSION(0, 1, 0, 0)
 class App;
-
-struct uniform {
-  alignas(16) glm::mat4 view;
-  alignas(16) glm::mat4 proj;
-};
-
-struct alignas(16) hitData {
-  glm::vec4 wo;
-  glm::vec4 wi;
-  glm::vec4 hit;
-  glm::vec4 normal;
-  glm::vec4 color;
-  int depth;
-  int pad[3];
-};
-
-struct alignas(16) data {
-  int numSpheres;
-  int numPlanes;
-  int numLights;
-  int numRays;
-  int maxBounces;
-  int pad[3];
-};
 
 /**
  * @brief Vulkan Engine Renderer
@@ -66,12 +47,14 @@ public:
 
     Pipeline pipeline;
     vk::PipelineLayout pipelineLayout{VK_NULL_HANDLE};
-    vk::Semaphore acquireSemaphore,releaseSemaphore, copySemaphore;
+    vk::Semaphore acquireSemaphore, releaseSemaphore, copySemaphore;
     vk::Fence copyFinishFence;
     vk::Queue queue{VK_NULL_HANDLE};
     uint32_t queueIDX;
     std::vector<vk::CommandBuffer> commandBuffer{};
     vk::CommandBuffer acquireBuffer, releaseBuffer, copyBuffer;
+
+    ResourceImage displayImg;
 
     vk::CommandPool commandPool{VK_NULL_HANDLE};
 
@@ -79,30 +62,31 @@ public:
 
   // Resources for the compute part of the example
   struct Compute {
-    enum imageUsageType{
-      compute = 0,
-      display = 1
-    };
-    vk::Queue queue{VK_NULL_HANDLE};
+    vk::Queue queue;
     uint32_t queueIDX;
 
-    vk::CommandPool commandPool{VK_NULL_HANDLE};
-
+    vk::CommandPool commandPool;
     vk::CommandBuffer commandBuffer;
 
     vk::DescriptorSetLayout descriptorSetLayout;
-    vk::DescriptorSet  descriptorSet;
-    vk::DescriptorPool descriptorPool{VK_NULL_HANDLE};
+    vk::DescriptorSet descriptorSet;
+    vk::DescriptorPool descriptorPool;
+    vk::PushConstantRange pushConstantsRange;
     Pipeline pipeline;
 
     vk::CommandBuffer acquireBuffer, releaseBuffer;
+
     Buffer uniformBuffer;
-    Buffer storageBuffer;
-    std::array<ResourceImage, 2> storageImg;
+    Buffer dataBuffer;
+    Buffer RNGbuffer;
+    ResourceImage computeImg;
+    Tracer::PushConstants constants;
+    Tracer::camera proj_view_uniforms;
+
 
     vk::Fence computeFence;
     vk::Semaphore computeFinishedSemaphore; // Framesinflight = 3
-    vk::Semaphore acquireSemaphore,releaseSemaphore;
+    vk::Semaphore acquireSemaphore, releaseSemaphore;
     uint32_t currentComputeBuffer = 0;
 
     static constexpr uint32_t rays_per_pixel = 1;
@@ -163,9 +147,9 @@ public:
   void updateState();
 
   /**
-   * @brief Update MVP matrix
+   * @brief Update Descriptors and push constants
    */
-  void updateMVP(glm::vec3 pos, glm::vec3 at);
+  void updateShaderData(vk::CommandBuffer cmdBuffer);
 
 public:
   std::queue<std::function<void()>> *renderCommands;
@@ -446,10 +430,6 @@ private:
    */
   uint32_t currentFrame;
 
-  /**
-   * @brief Scene ViewProj matrix
-   */
-  uniform proj_view_uniforms;
 
   // IMGUI stuff
 private:

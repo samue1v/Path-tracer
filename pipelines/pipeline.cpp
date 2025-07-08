@@ -6,12 +6,12 @@
 
 void Pipeline::createPipeline(
     vk::Device device, const char *shaderPath, const char *fragShaderPath,
-    vk::RenderPass renderPass, vk::DescriptorSetLayout descriptorLayout,
+    vk::RenderPass renderPass, vk::DescriptorSetLayout descriptorLayout, vk::PushConstantRange pushConstantRange,
     std::deque<std::function<void(vk::Device)>> &deletionQueue) {}
 
 void Pipeline::createPipeline(
     vk::Device device, const char *shaderPath,
-    vk::DescriptorSetLayout descriptorSetLayout,
+    vk::DescriptorSetLayout descriptorSetLayout,vk::PushConstantRange pushConstantRange,
     std::deque<std::function<void(vk::Device)>> &deletionQueue) {
 
   char buffer[1024];
@@ -24,13 +24,13 @@ void Pipeline::createPipeline(
   auto shadersPath = rootPath / "shaders" / "compiled";
   std::string vertShaderSrc = shadersPath / shaderPath;
 
-  buildPipeline(device, vertShaderSrc.c_str(), descriptorSetLayout,
+  buildPipeline(device, vertShaderSrc.c_str(), descriptorSetLayout, pushConstantRange,
                 deletionQueue);
 }
 
 void Pipeline::buildPipeline(
     vk::Device device, const char *shaderPath,
-    vk::DescriptorSetLayout descriptorSetLayout,
+    vk::DescriptorSetLayout descriptorSetLayout,vk::PushConstantRange pushConstantRange,
     std::deque<std::function<void(vk::Device)>> &deletionQueue) {
   auto shaderCode = readShader(shaderPath);
 
@@ -47,6 +47,8 @@ void Pipeline::buildPipeline(
   pipelineLayoutInfo.setLayoutCount = 1;
   pipelineLayoutInfo.pushConstantRangeCount = 0;
   pipelineLayoutInfo.pSetLayouts = &descriptorSetLayout;
+  pipelineLayoutInfo.pushConstantRangeCount = 1;
+  pipelineLayoutInfo.pPushConstantRanges = &pushConstantRange;
 
   auto resLayout = device.createPipelineLayout(pipelineLayoutInfo);
 

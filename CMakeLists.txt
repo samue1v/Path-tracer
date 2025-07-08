@@ -3,8 +3,8 @@ project(Engine)
 
 set(CMAKE_CXX_STANDARD 20)
 
-set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O2")
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g -O0 -Wall -Wextra")
+#set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O2")
+#set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g -O0 -Wall -Wextra")
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
@@ -74,20 +74,29 @@ set(CONFIG_SOURCES
    config/Logger.cpp
    )
 
+set(TRACER_SOURCES
+   tracer/tracer.hpp
+   )
 
-add_executable(engine main.cpp ${BACKEND_SOURCES} ${ENGINE_SOURCES} ${PIPELINE_SOURCES} ${TARGET_SOURCES} ${APP_SOURCES} ${CONFIG_SOURCES} ${IMGUI_SOURCES}  ) 
+
+add_executable(engine main.cpp ${BACKEND_SOURCES} ${ENGINE_SOURCES} ${PIPELINE_SOURCES} ${TARGET_SOURCES} ${APP_SOURCES} ${CONFIG_SOURCES} ${TRACER_SOURCES} ${IMGUI_SOURCES}  ) 
 
 target_include_directories(engine PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/backend 
                                           ${CMAKE_CURRENT_SOURCE_DIR}/engine 
                                           ${CMAKE_CURRENT_SOURCE_DIR}/pipelines
                                           ${CMAKE_CURRENT_SOURCE_DIR}/targets
                                           ${CMAKE_CURRENT_SOURCE_DIR}/config
+                                          ${CMAKE_CURRENT_SOURCE_DIR}/tracer
                                           ${CMAKE_CURRENT_SOURCE_DIR}/App
                                           ${CMAKE_CURRENT_SOURCE_DIR}/libs/imgui
                                           ${Vulkan_INCLUDE_DIRS}
                                           )
 
 
-                                       target_link_libraries(engine ${Vulkan} glfw dl pthread GPUOpen::VulkanMemoryAllocator ${EXTRA_LIBS} )
+target_link_libraries(engine ${Vulkan} glfw dl pthread GPUOpen::VulkanMemoryAllocator ${EXTRA_LIBS} )
 
 
+target_compile_options(engine PRIVATE
+    $<$<CONFIG:Debug>:-g -O0 -Wall -Wextra>
+    $<$<CONFIG:Release>:-O2 -DNDEBUG -w>
+)

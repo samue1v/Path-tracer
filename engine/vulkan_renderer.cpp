@@ -63,12 +63,14 @@ VulkanRender::~VulkanRender() {
 
   chain.cleanUp();
 
-  compute.storageImg[0].cleanUp();
-  compute.storageImg[1].cleanUp();
+  compute.computeImg.cleanUp();
+  graphics.displayImg.cleanUp();
 
   compute.uniformBuffer.cleanUp();
 
-  compute.storageBuffer.cleanUp();
+  compute.dataBuffer.cleanUp();
+
+  compute.RNGbuffer.cleanUp();
 
   vmaDestroyAllocator(this->allocator);
 
@@ -115,7 +117,7 @@ void VulkanRender::createUniformBuffers() {
   vk::BufferCreateInfo bufferInfo{};
   bufferInfo.sType = vk::StructureType::eBufferCreateInfo;
   bufferInfo.usage = usageFlags;
-  bufferInfo.size = sizeof(proj_view_uniforms);
+  bufferInfo.size = sizeof(Tracer::camera);
   bufferInfo.sharingMode = vk::SharingMode::eExclusive;
   compute.uniformBuffer.create(logicalDevice, allocator, bufferInfo,
                                allocFlags);
@@ -164,22 +166,18 @@ void VulkanRender::createImageResources() {
 
   commandBuffer.begin(beginInfo);
 
-  compute.storageImg[compute.imageUsageType::compute].createImage(
-      logicalDevice, allocator, createInfo);
-  compute.storageImg[compute.imageUsageType::compute].createView(
-      vk::ImageAspectFlagBits::eColor);
-  compute.storageImg[compute.imageUsageType::compute].transitionLayout(
+  compute.computeImg.createImage(logicalDevice, allocator, createInfo);
+  compute.computeImg.createView(vk::ImageAspectFlagBits::eColor);
+  compute.computeImg.transitionLayout(
       commandBuffer, {compute.queueIDX, compute.queueIDX},
       vk::ImageLayout::eUndefined, vk::ImageLayout::eGeneral,
       vk::AccessFlagBits::eNone, vk::AccessFlagBits::eShaderWrite,
       vk::PipelineStageFlagBits::eTopOfPipe,
       vk::PipelineStageFlagBits::eComputeShader);
 
-  compute.storageImg[compute.imageUsageType::display].createImage(
-      logicalDevice, allocator, createInfo);
-  compute.storageImg[compute.imageUsageType::display].createView(
-      vk::ImageAspectFlagBits::eColor);
-  compute.storageImg[compute.imageUsageType::display].transitionLayout(
+  graphics.displayImg.createImage(logicalDevice, allocator, createInfo);
+  graphics.displayImg.createView(vk::ImageAspectFlagBits::eColor);
+  graphics.displayImg.transitionLayout(
       commandBuffer, {graphics.queueIDX, graphics.queueIDX},
       vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferSrcOptimal,
       vk::AccessFlagBits::eNone, vk::AccessFlagBits::eTransferRead,
@@ -204,17 +202,32 @@ void VulkanRender::createBufferResources() {
       VmaAllocationCreateFlagBits::
           VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT |
       VmaAllocationCreateFlagBits::VMA_ALLOCATION_CREATE_MAPPED_BIT;
-  vk::BufferCreateInfo bufferInfo{};
-  bufferInfo.sType = vk::StructureType::eBufferCreateInfo;
-  bufferInfo.usage = usageFlags;
-  bufferInfo.size = sizeof(hitData) * compute.rays_per_pixel *
-                    chain.extent.width * chain.extent.height;
-  bufferInfo.sharingMode = vk::SharingMode::eExclusive;
-  compute.storageBuffer.create(logicalDevice, allocator, bufferInfo,
-                               allocFlags);
+
+  vk::BufferCreateInfo bufferInfoData{};
+  bufferInfoData.sType = vk::StructureType::eBufferCreateInfo;
+  bufferInfoData.usage = usageFlags;
+  bufferInfoData.size = sizeof(Tracer::hitData) * compute.rays_per_pixel *
+                        chain.extent.width * chain.extent.height;
+  bufferInfoData.sharingMode = vk::SharingMode::eExclusive;
+  compute.dataBuffer.create(logicalDevice, allocator, bufferInfoData,
+                            allocFlags);
+
+  vk::BufferCreateInfo bufferInfoRNG{};
+  bufferInfoRNG.sType = vk::StructureType::eBufferCreateInfo;
+  bufferInfoRNG.usage = usageFlags;
+  bufferInfoRNG.size =
+      sizeof(Tracer::PCG32) * chain.extent.width * chain.extent.height;
+  bufferInfoRNG.sharingMode = vk::SharingMode::eExclusive;
+  compute.RNGbuffer.create(logicalDevice, allocator, bufferInfoRNG, allocFlags);
 }
 
-void VulkanRender::updateMVP(glm::vec3 pos, glm::vec3 at) {}
+void VulkanRender::updateShaderData(vk::CommandBuffer cmdBuffer) {
+  // Update constant;
+
+  cmdBuffer.pushConstants(compute.pipeline.layout,
+                          vk::ShaderStageFlagBits::eCompute, 0,
+                          sizeof(Tracer::PushConstants), &compute.constants);
+}
 
 void VulkanRender::drawFrame() {
   logicalDevice.waitForFences(1, &inFlightFences[currentFrame], vk::True,
@@ -260,6 +273,18 @@ void VulkanRender::drawFrame() {
     submitInfo.pWaitDstStageMask = &waitStageCompute;
 
     compute.queue.submit(1, &submitInfo, compute.computeFence);
+    if (enableValidationLayers) {
+      auto now = std::chrono::system_clock::now();
+
+      std::time_t now_time_t = std::chrono::system_clock::to_time_t(now);
+
+      std::tm local_tm = *std::localtime(&now_time_t);
+
+      std::ostringstream oss;
+      oss << std::put_time(&local_tm, "%Y-%m-%d %H:%M:%S");
+
+      Logger::log(Logger::LogLevel::DEBUG, "Compute done at: " + oss.str());
+    }
     // logicalDevice.waitForFences(1,&compute.computeFence,1, UINT64_MAX);
   }
 
@@ -325,7 +350,7 @@ void VulkanRender::swapComputePresentImages() {
   assert(res == vk::Result::eSuccess);
 
   // Transition compute image from GENERAL to TRANSFERSRC
-  compute.storageImg[compute.imageUsageType::compute].transitionLayout(
+  compute.computeImg.transitionLayout(
       compute.releaseBuffer, {compute.queueIDX, graphics.queueIDX},
       vk::ImageLayout::eGeneral, vk::ImageLayout::eTransferSrcOptimal,
       vk::AccessFlagBits::eShaderWrite, vk::AccessFlagBits::eTransferRead,
@@ -347,7 +372,7 @@ void VulkanRender::swapComputePresentImages() {
 
   graphics.acquireBuffer.begin(beginInfo);
 
-  compute.storageImg[compute.imageUsageType::compute].transitionLayout(
+  compute.computeImg.transitionLayout(
       graphics.acquireBuffer, {compute.queueIDX, graphics.queueIDX},
       vk::ImageLayout::eGeneral, vk::ImageLayout::eTransferSrcOptimal,
       vk::AccessFlagBits::eShaderWrite, vk::AccessFlagBits::eTransferRead,
@@ -355,7 +380,7 @@ void VulkanRender::swapComputePresentImages() {
       vk::PipelineStageFlagBits::eTransfer);
 
   // Transition display image from TRANSFERSRC to TRANSFERDST
-  compute.storageImg[compute.imageUsageType::display].transitionLayout(
+  graphics.displayImg.transitionLayout(
       graphics.acquireBuffer, {graphics.queueIDX, graphics.queueIDX},
       vk::ImageLayout::eTransferSrcOptimal,
       vk::ImageLayout::eTransferDstOptimal, vk::AccessFlagBits::eTransferRead,
@@ -397,12 +422,11 @@ void VulkanRender::swapComputePresentImages() {
   copyRegion.extent = {{chain.extent.width, chain.extent.height, 1}};
 
   graphics.copyBuffer.copyImage(
-      compute.storageImg[compute.imageUsageType::compute].image_,
-      vk::ImageLayout::eTransferSrcOptimal,
-      compute.storageImg[compute.imageUsageType::display].image_,
-      vk::ImageLayout::eTransferDstOptimal, 1, &copyRegion);
+      compute.computeImg.image_, vk::ImageLayout::eTransferSrcOptimal,
+      graphics.displayImg.image_, vk::ImageLayout::eTransferDstOptimal, 1,
+      &copyRegion);
 
-  compute.storageImg[compute.imageUsageType::display].transitionLayout(
+  graphics.displayImg.transitionLayout(
       graphics.copyBuffer, {graphics.queueIDX, graphics.queueIDX},
       vk::ImageLayout::eTransferDstOptimal,
       vk::ImageLayout::eTransferSrcOptimal, vk::AccessFlagBits::eTransferWrite,
@@ -429,7 +453,7 @@ void VulkanRender::swapComputePresentImages() {
   graphics.releaseBuffer.begin(beginInfo);
 
   // Transfer ownership back to compute
-  compute.storageImg[compute.imageUsageType::compute].transitionLayout(
+  compute.computeImg.transitionLayout(
       graphics.releaseBuffer, {graphics.queueIDX, compute.queueIDX},
       vk::ImageLayout::eTransferSrcOptimal,
       vk::ImageLayout::eTransferSrcOptimal, vk::AccessFlagBits::eTransferRead,
@@ -455,15 +479,7 @@ void VulkanRender::swapComputePresentImages() {
 
   compute.acquireBuffer.begin(beginInfo);
 
-  // compute.storageImg[compute.imageUsageType::compute].transitionLayout(
-  //     compute.acquireBuffer, {graphics.queueIDX, compute.queueIDX},
-  //     vk::ImageLayout::eTransferSrcOptimal,
-  //     vk::ImageLayout::eTransferSrcOptimal,
-  //     vk::AccessFlagBits::eTransferRead, vk::AccessFlagBits::eTransferRead,
-  //     vk::PipelineStageFlagBits::eTopOfPipe,
-  //     vk::PipelineStageFlagBits::eTransfer);
-
-  compute.storageImg[compute.imageUsageType::compute].transitionLayout(
+  compute.computeImg.transitionLayout(
       compute.acquireBuffer, {graphics.queueIDX, compute.queueIDX},
       vk::ImageLayout::eTransferSrcOptimal, vk::ImageLayout::eGeneral,
       vk::AccessFlagBits::eTransferRead, vk::AccessFlagBits::eShaderWrite,
@@ -492,13 +508,14 @@ void VulkanRender::swapComputePresentImages() {
 }
 
 void VulkanRender::recordComputeCommandBuffer(vk::CommandBuffer cmdBuffer) {
-  // TODO ...
 
   cmdBuffer.reset();
 
   vk::CommandBufferBeginInfo beginInfo{};
   beginInfo.sType = vk::StructureType::eCommandBufferBeginInfo;
   cmdBuffer.begin(&beginInfo);
+
+  updateShaderData(cmdBuffer);
 
   cmdBuffer.bindPipeline(vk::PipelineBindPoint::eCompute,
                          compute.pipeline.pipeline);
@@ -508,66 +525,9 @@ void VulkanRender::recordComputeCommandBuffer(vk::CommandBuffer cmdBuffer) {
 
   cmdBuffer.dispatch((chain.extent.width + 15) / 16,
                      (chain.extent.height + 15) / 16, 1);
-  // Logger::log(Logger::LogLevel::DEBUG, "Compute");
-
-  // compute.storageImg[compute.imageUsageType::compute].transitionLayout(
-  //     compute.commandBuffer, {compute.queueIDX, graphics.queueIDX},
-  //     vk::ImageLayout::eGeneral, vk::ImageLayout::eTransferSrcOptimal,
-  //     vk::AccessFlagBits::eShaderWrite, vk::AccessFlagBits::eNone,
-  //     vk::PipelineStageFlagBits::eComputeShader,
-  //     vk::PipelineStageFlagBits::eBottomOfPipe);
 
   compute.commandBuffer.end();
 }
-
-// void VulkanRender::prepareComputeCopy(uint32_t commandBufferIndex,
-//                                       uint32_t swapchainImageIdx) {
-//   // TODO ..
-//   vk::CommandBufferAllocateInfo allocInfo{};
-//   allocInfo.sType = vk::StructureType::eCommandBufferAllocateInfo;
-//   allocInfo.level = vk::CommandBufferLevel::ePrimary;
-//   allocInfo.commandPool = graphics.commandPool;
-//   allocInfo.commandBufferCount = 1;
-//
-//   vk::CommandBuffer commandBuffer;
-//   logicalDevice.allocateCommandBuffers(&allocInfo, &commandBuffer);
-//
-//   vk::CommandBufferBeginInfo beginInfo{};
-//   beginInfo.sType = vk::StructureType::eCommandBufferBeginInfo;
-//   beginInfo.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit;
-//
-//   commandBuffer.begin(&beginInfo);
-//
-//   compute.storageImg[commandBufferIndex].transitionLayout(
-//       commandBuffer, {compute.queueIDX, graphics.queueIDX},
-//       vk::ImageLayout::eTransferSrcOptimal,
-//       vk::ImageLayout::eTransferSrcOptimal, vk::AccessFlagBits::eNone,
-//       vk::AccessFlagBits::eTransferRead,
-//       vk::PipelineStageFlagBits::eTopOfPipe,
-//       vk::PipelineStageFlagBits::eTransfer);
-//
-//   // TODO ...
-//   // copy here
-//   //
-//
-//   compute.storageImg[commandBufferIndex].transitionLayout(
-//       commandBuffer, {graphics.queueIDX, compute.queueIDX},
-//       vk::ImageLayout::eTransferSrcOptimal, vk::ImageLayout::eGeneral,
-//       vk::AccessFlagBits::eTransferRead, vk::AccessFlagBits::eNone,
-//       vk::PipelineStageFlagBits::eTransfer,
-//       vk::PipelineStageFlagBits::eBottomOfPipe);
-//
-//   commandBuffer.end();
-//
-//   vk::SubmitInfo submitInfo{};
-//   submitInfo.sType = vk::StructureType::eSubmitInfo;
-//   submitInfo.commandBufferCount = 1;
-//   submitInfo.pCommandBuffers = &commandBuffer;
-//
-//   graphics.queue.submit(1, &submitInfo, vk::Fence{});
-//   graphics.queue.waitIdle();
-//   logicalDevice.freeCommandBuffers(graphics.commandPool, commandBuffer);
-// }
 
 void VulkanRender::createDescriptorSets() {
 
@@ -584,18 +544,23 @@ void VulkanRender::createDescriptorSets() {
   vk::DescriptorBufferInfo uniformBufferInfo{};
   uniformBufferInfo.buffer = compute.uniformBuffer.buffer;
   uniformBufferInfo.offset = 0;
-  uniformBufferInfo.range = sizeof(proj_view_uniforms);
+  uniformBufferInfo.range = sizeof(Tracer::camera);
 
   vk::DescriptorBufferInfo storageBufferInfo{};
-  storageBufferInfo.buffer = compute.storageBuffer.buffer;
+  storageBufferInfo.buffer = compute.dataBuffer.buffer;
   storageBufferInfo.offset = 0;
-  storageBufferInfo.range = sizeof(hitData);
+  storageBufferInfo.range = sizeof(Tracer::hitData) * compute.rays_per_pixel *
+                            chain.extent.width * chain.extent.height;
 
   vk::DescriptorImageInfo imageInfoA{};
-  imageInfoA.imageView =
-      compute.storageImg[compute.imageUsageType::compute].view_;
-  imageInfoA.imageLayout =
-      compute.storageImg[compute.imageUsageType::compute].currentLayout_;
+  imageInfoA.imageView = compute.computeImg.view_;
+  imageInfoA.imageLayout = compute.computeImg.currentLayout_;
+
+  vk::DescriptorBufferInfo rngBufferInfo{};
+  rngBufferInfo.buffer = compute.RNGbuffer.buffer;
+  rngBufferInfo.offset = 0;
+  rngBufferInfo.range =
+      sizeof(Tracer::PCG32) * chain.extent.width * chain.extent.height;
 
   // vk::DescriptorImageInfo imageInfoB{};
   // imageInfoB.imageView = compute.storageImg[1].view_;
@@ -603,7 +568,7 @@ void VulkanRender::createDescriptorSets() {
 
   // for (int i = 0; i < 2; i++) {
 
-  std::array<vk::WriteDescriptorSet, 3> descriptorWrites;
+  std::array<vk::WriteDescriptorSet, 4> descriptorWrites;
 
   descriptorWrites[0].sType = vk::StructureType::eWriteDescriptorSet;
   descriptorWrites[0].dstSet = compute.descriptorSet;
@@ -629,8 +594,15 @@ void VulkanRender::createDescriptorSets() {
   descriptorWrites[2].descriptorCount = 1;
   descriptorWrites[2].pImageInfo = &imageInfoA;
 
+  descriptorWrites[3].sType = vk::StructureType::eWriteDescriptorSet;
+  descriptorWrites[3].dstSet = compute.descriptorSet;
+  descriptorWrites[3].dstBinding = 3;
+  descriptorWrites[3].dstArrayElement = 0;
+  descriptorWrites[3].descriptorType = vk::DescriptorType::eStorageBuffer;
+  descriptorWrites[3].descriptorCount = 1;
+  descriptorWrites[3].pBufferInfo = &rngBufferInfo;
+
   logicalDevice.updateDescriptorSets(descriptorWrites, nullptr);
-  //}
 }
 
 void VulkanRender::createInstance() {
@@ -783,29 +755,28 @@ void VulkanRender::createPhysicalDevice() {
                                               "." + std::to_string(patch) +
                                               "." + std::to_string(variant));
 
-       VkPhysicalDeviceDriverProperties driverProps = {};
-       driverProps.sType =
-       VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DRIVER_PROPERTIES;
+      VkPhysicalDeviceDriverProperties driverProps = {};
+      driverProps.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DRIVER_PROPERTIES;
 
-       VkPhysicalDeviceProperties2 props2 = {};
-       props2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
-       props2.pNext = &driverProps;
+      VkPhysicalDeviceProperties2 props2 = {};
+      props2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
+      props2.pNext = &driverProps;
 
-       vkGetPhysicalDeviceProperties2(physicalDevice, &props2);
+      vkGetPhysicalDeviceProperties2(physicalDevice, &props2);
 
-       Logger::log(Logger::LogLevel::INFO,
-                   "Driver: " + std::string(driverProps.driverInfo));
+      Logger::log(Logger::LogLevel::INFO,
+                  "Driver: " + std::string(driverProps.driverInfo));
 
-       uint32_t maxInvocations = prop.limits.maxComputeWorkGroupInvocations;
-       VkExtent3D maxSize = {prop.limits.maxComputeWorkGroupSize[0],
-                             prop.limits.maxComputeWorkGroupSize[1],
-                             prop.limits.maxComputeWorkGroupSize[2]};
-       Logger::log(Logger::LogLevel::DEBUG,
-                   "Max invocations: " + std::to_string(maxInvocations));
-       Logger::log(Logger::LogLevel::DEBUG,
-                   "X: " + std::to_string(maxSize.width) + " | " +
-                       "Y: " + std::to_string(maxSize.height) + " | " +
-                       "Z: " + std::to_string(maxSize.depth));
+      uint32_t maxInvocations = prop.limits.maxComputeWorkGroupInvocations;
+      VkExtent3D maxSize = {prop.limits.maxComputeWorkGroupSize[0],
+                            prop.limits.maxComputeWorkGroupSize[1],
+                            prop.limits.maxComputeWorkGroupSize[2]};
+      Logger::log(Logger::LogLevel::DEBUG,
+                  "Max invocations: " + std::to_string(maxInvocations));
+      Logger::log(Logger::LogLevel::DEBUG,
+                  "X: " + std::to_string(maxSize.width) + " | " +
+                      "Y: " + std::to_string(maxSize.height) + " | " +
+                      "Z: " + std::to_string(maxSize.depth));
 
       break;
     }
@@ -1277,8 +1248,6 @@ void VulkanRender::fromTransferToSwapchain(vk::CommandBuffer commandBuffer,
 
 void VulkanRender::recordGraphicCommandBuffer(vk::CommandBuffer commandBuffer,
                                               uint32_t imageIndex) {
-  // TODO include ACQUIRE AND RELEASE BARRIES, CHANGED THE SOURCE AND DST QUEUE
-  // IN TRANSITION LAYOUT
   vk::CommandBufferBeginInfo beginInfo{};
   beginInfo.sType = vk::StructureType::eCommandBufferBeginInfo;
   beginInfo.pInheritanceInfo = nullptr;
@@ -1303,10 +1272,10 @@ void VulkanRender::recordGraphicCommandBuffer(vk::CommandBuffer commandBuffer,
 
   copyRegion.extent = {{chain.extent.width, chain.extent.height, 1}};
 
-  commandBuffer.copyImage(
-      compute.storageImg[compute.imageUsageType::display].image_,
-      vk::ImageLayout::eTransferSrcOptimal, chain.frames[imageIndex].image,
-      vk::ImageLayout::eTransferDstOptimal, 1, &copyRegion);
+  commandBuffer.copyImage(graphics.displayImg.image_,
+                          vk::ImageLayout::eTransferSrcOptimal,
+                          chain.frames[imageIndex].image,
+                          vk::ImageLayout::eTransferDstOptimal, 1, &copyRegion);
 
   fromTransferToSwapchain(commandBuffer, chain.frames[imageIndex].image);
 
@@ -1468,8 +1437,16 @@ void VulkanRender::createDescriptorSetLayout() {
   imgLayoutBinding.stageFlags = vk::ShaderStageFlagBits::eCompute;
   imgLayoutBinding.pImmutableSamplers = nullptr;
 
+  vk::DescriptorSetLayoutBinding rngLayoutBinding{};
+  rngLayoutBinding.binding = 3;
+  rngLayoutBinding.descriptorType = vk::DescriptorType::eStorageBuffer;
+  rngLayoutBinding.descriptorCount = 1;
+  rngLayoutBinding.stageFlags = vk::ShaderStageFlagBits::eCompute;
+  rngLayoutBinding.pImmutableSamplers = nullptr;
+
   std::vector<vk::DescriptorSetLayoutBinding> bindings(
-      {uboLayoutBinding, ssboLayoutBinding, imgLayoutBinding});
+      {uboLayoutBinding, ssboLayoutBinding, imgLayoutBinding,
+       rngLayoutBinding});
 
   vk::DescriptorSetLayoutCreateInfo createInfo{};
   createInfo.sType = vk::StructureType::eDescriptorSetLayoutCreateInfo;
@@ -1480,6 +1457,11 @@ void VulkanRender::createDescriptorSetLayout() {
   assert(res.result == vk::Result::eSuccess);
 
   compute.descriptorSetLayout = res.value;
+
+  // Push constants
+  compute.pushConstantsRange.offset = 0;
+  compute.pushConstantsRange.size = sizeof(Tracer::PushConstants);
+  compute.pushConstantsRange.stageFlags = vk::ShaderStageFlagBits::eCompute;
 
   deviceGlobalGarbageQueue.push_back(
 
@@ -1499,13 +1481,13 @@ void VulkanRender::createPipeline() {
   //  vk::StructureType::ePipelineLayoutCreateInfo;
   //  computeLayoutCreateInfo.setLayoutCount = 1;
   //  computeLayoutCreateInfo.pSetLayouts = layouts.data();
-  compute.pipeline.createPipeline(logicalDevice, "pathTracer.comp.spv",
-                                  compute.descriptorSetLayout,
-                                  deviceGlobalGarbageQueue);
+  compute.pipeline.createPipeline(
+      logicalDevice, "pathTracer.comp.spv", compute.descriptorSetLayout,
+      compute.pushConstantsRange, deviceGlobalGarbageQueue);
 }
 
 void VulkanRender::createDescriptorPool() {
-  std::array<vk::DescriptorPoolSize, 3> poolSizes = {};
+  std::array<vk::DescriptorPoolSize, 4> poolSizes = {};
 
   poolSizes[0].type = vk::DescriptorType::eUniformBuffer;
   poolSizes[0].descriptorCount = 1;
@@ -1515,6 +1497,9 @@ void VulkanRender::createDescriptorPool() {
 
   poolSizes[2].type = vk::DescriptorType::eStorageImage;
   poolSizes[2].descriptorCount = 1;
+
+  poolSizes[3].type = vk::DescriptorType::eStorageBuffer;
+  poolSizes[3].descriptorCount = 1;
 
   vk::DescriptorPoolCreateInfo poolInfo{};
   poolInfo.sType = vk::StructureType::eDescriptorPoolCreateInfo;
@@ -1638,4 +1623,18 @@ void VulkanRender::updateState() {
     command();
 }
 
-void VulkanRender::showMenu() {}
+void VulkanRender::showMenu() {
+  static int r = 0;
+  static int g = 0;
+  static int b = 0;
+  ImGui::SetNextWindowSize(ImVec2(0, 0), ImGuiCond_Always);
+  ImGui::Begin("Color Menu", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
+  ImGui::SliderInt("R", &r, 0, 255, "%d");
+  ImGui::SliderInt("G", &g, 0, 255, "%d");
+  ImGui::SliderInt("B", &b, 0, 255, "%d");
+
+  compute.constants.test_color.r = r;
+  compute.constants.test_color.g = g;
+  compute.constants.test_color.b = b;
+  ImGui::End();
+}
