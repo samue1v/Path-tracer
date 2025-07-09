@@ -223,9 +223,14 @@ void VulkanRender::createBufferResources() {
   compute.RNGbuffer.create(logicalDevice, allocator, bufferInfoRNG, allocFlags);
 }
 
-void VulkanRender::initializeBuffers(){
- TauswortheOperator op; 
- op.doOperation(compute.RNGbuffer, chain.extent.width * chain.extent.height, allocator);
+void VulkanRender::initializeBuffers() {
+  TauswortheOperator rd_op;
+  MultiJitterOperator mj_op(chain.extent.width, chain.extent.height,
+                            compute.rays_per_pixel);
+  rd_op.doOperation(compute.RNGbuffer, chain.extent.width * chain.extent.height,
+                    allocator);
+  mj_op.doOperation(compute.dataBuffer,
+                    chain.extent.width * chain.extent.height, allocator);
 }
 
 void VulkanRender::updateShaderData(vk::CommandBuffer cmdBuffer) {

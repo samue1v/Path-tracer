@@ -86,10 +86,10 @@ void main() {
     ivec2 center = imageSize / 2;
     vec4 color = vec4(0.0, 0.0, 0.0, 1.0); 
     ivec2 delta = pos - center;
-    if (dot(delta, delta) <= 100 * 100) {
-    	
-       color = vec4(c0,c1,c2,1.0);
-    }
+    //if (dot(delta, delta) <= 100 * 100) {
+    	color = hit_data[index].color;
+       //color = vec4(c0,c1,c2,1.0);
+    //}
 
 
     hit_data[index].depth += 1;
