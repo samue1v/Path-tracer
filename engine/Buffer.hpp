@@ -1,3 +1,5 @@
+#ifndef BUFFER_HPP
+#define BUFFER_HPP
 #include <vk_mem_alloc.h>
 #include <vulkan/vulkan.hpp>
 
@@ -16,3 +18,4 @@ public:
   VmaAllocation allocation;
   VmaAllocationInfo allocationInfo;
 };
+#endif

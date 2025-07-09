@@ -6,10 +6,10 @@
 
 namespace Tracer {
 
-    struct alignas(16) PCG32 {
-      uint32_t state;
-      uint32_t inc;
-      uint32_t pad[2];
+    struct alignas(16) PRNG32 {
+      glm::uvec4 state;
+      float value;
+      uint32_t pad[3];
     };
     
     struct camera {

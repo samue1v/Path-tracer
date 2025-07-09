@@ -19,6 +19,7 @@
 #include <iomanip>
 
 #include "Buffer.hpp"
+#include "BufferOperator.hpp"
 #include "Logger.hpp"
 #include "ResourceImage.hpp"
 #include "frame.hpp"
@@ -82,7 +83,6 @@ public:
     ResourceImage computeImg;
     Tracer::PushConstants constants;
     Tracer::camera proj_view_uniforms;
-
 
     vk::Fence computeFence;
     vk::Semaphore computeFinishedSemaphore; // Framesinflight = 3
@@ -297,6 +297,11 @@ private:
   void swapComputePresentImages();
 
   /**
+   * @brief Initialize buffer data if needed
+   */
+  void initializeBuffers();
+
+  /**
    * @brief Record compute command buffer
    * @param cmdBuffer Target command buffer and storage image to
    * record
@@ -429,7 +434,6 @@ private:
    * @brief Current frame index
    */
   uint32_t currentFrame;
-
 
   // IMGUI stuff
 private:

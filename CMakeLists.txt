@@ -76,6 +76,8 @@ set(CONFIG_SOURCES
 
 set(TRACER_SOURCES
    tracer/tracer.hpp
+   tracer/BufferOperator.hpp
+   tracer/BufferOperator.cpp
    )
 
 

@@ -39,6 +39,8 @@ void VulkanRender::init() {
 
   createBufferResources();
 
+  initializeBuffers();
+
   createUniformBuffers();
 
   createDescriptorSetLayout();
@@ -216,9 +218,14 @@ void VulkanRender::createBufferResources() {
   bufferInfoRNG.sType = vk::StructureType::eBufferCreateInfo;
   bufferInfoRNG.usage = usageFlags;
   bufferInfoRNG.size =
-      sizeof(Tracer::PCG32) * chain.extent.width * chain.extent.height;
+      sizeof(Tracer::PRNG32) * chain.extent.width * chain.extent.height;
   bufferInfoRNG.sharingMode = vk::SharingMode::eExclusive;
   compute.RNGbuffer.create(logicalDevice, allocator, bufferInfoRNG, allocFlags);
+}
+
+void VulkanRender::initializeBuffers(){
+ TauswortheOperator op; 
+ op.doOperation(compute.RNGbuffer, chain.extent.width * chain.extent.height, allocator);
 }
 
 void VulkanRender::updateShaderData(vk::CommandBuffer cmdBuffer) {
@@ -560,7 +567,7 @@ void VulkanRender::createDescriptorSets() {
   rngBufferInfo.buffer = compute.RNGbuffer.buffer;
   rngBufferInfo.offset = 0;
   rngBufferInfo.range =
-      sizeof(Tracer::PCG32) * chain.extent.width * chain.extent.height;
+      sizeof(Tracer::PRNG32) * chain.extent.width * chain.extent.height;
 
   // vk::DescriptorImageInfo imageInfoB{};
   // imageInfoB.imageView = compute.storageImg[1].view_;
