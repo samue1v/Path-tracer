@@ -63,6 +63,10 @@ public:
 
   // Resources for the compute part of the example
   struct Compute {
+
+    static constexpr uint32_t rays_per_pixel = 1;
+    static constexpr uint32_t MAX_OBJECT_SIZE = 20;
+
     vk::Queue queue;
     uint32_t queueIDX;
 
@@ -80,16 +84,20 @@ public:
     Buffer uniformBuffer;
     Buffer dataBuffer;
     Buffer RNGbuffer;
+    Buffer spheresBuffer;
+    Buffer planesBuffer;
+
     ResourceImage computeImg;
     Tracer::PushConstants constants;
-    Tracer::camera proj_view_uniforms;
+    Tracer::camera cameraUniform;
+    std::vector<Tracer::sphere> spheres;
+    std::vector<Tracer::plane> planes;
 
     vk::Fence computeFence;
     vk::Semaphore computeFinishedSemaphore; // Framesinflight = 3
     vk::Semaphore acquireSemaphore, releaseSemaphore;
     uint32_t currentComputeBuffer = 0;
 
-    static constexpr uint32_t rays_per_pixel = 1;
   } compute;
   /**
    * @brief Construct new Engine object
@@ -300,6 +308,11 @@ private:
    * @brief Initialize buffer data if needed
    */
   void initializeBuffers();
+
+  /**
+   * @brief Initialize scene objects and camera
+   */
+  void initializeScene();
 
   /**
    * @brief Record compute command buffer

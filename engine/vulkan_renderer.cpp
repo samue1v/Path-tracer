@@ -37,11 +37,13 @@ void VulkanRender::init() {
 
   createImageResources();
 
+  initializeScene();
+
+  createUniformBuffers();
+
   createBufferResources();
 
   initializeBuffers();
-
-  createUniformBuffers();
 
   createDescriptorSetLayout();
 
@@ -73,6 +75,10 @@ VulkanRender::~VulkanRender() {
   compute.dataBuffer.cleanUp();
 
   compute.RNGbuffer.cleanUp();
+
+  compute.spheresBuffer.cleanUp();
+
+  compute.planesBuffer.cleanUp();
 
   vmaDestroyAllocator(this->allocator);
 
@@ -221,20 +227,77 @@ void VulkanRender::createBufferResources() {
       sizeof(Tracer::PRNG32) * chain.extent.width * chain.extent.height;
   bufferInfoRNG.sharingMode = vk::SharingMode::eExclusive;
   compute.RNGbuffer.create(logicalDevice, allocator, bufferInfoRNG, allocFlags);
+
+  vk::BufferCreateInfo bufferInfoSpheres{};
+  bufferInfoSpheres.sType = vk::StructureType::eBufferCreateInfo;
+  bufferInfoSpheres.usage = usageFlags;
+  bufferInfoSpheres.size = sizeof(Tracer::sphere) * compute.MAX_OBJECT_SIZE;
+  bufferInfoSpheres.sharingMode = vk::SharingMode::eExclusive;
+  compute.spheresBuffer.create(logicalDevice, allocator, bufferInfoSpheres,
+                               allocFlags);
+
+  vk::BufferCreateInfo bufferInfoPlanes{};
+  bufferInfoPlanes.sType = vk::StructureType::eBufferCreateInfo;
+  bufferInfoPlanes.usage = usageFlags;
+  bufferInfoPlanes.size = sizeof(Tracer::plane) * compute.MAX_OBJECT_SIZE;
+  bufferInfoPlanes.sharingMode = vk::SharingMode::eExclusive;
+  compute.planesBuffer.create(logicalDevice, allocator, bufferInfoPlanes,
+                              allocFlags);
+}
+
+void VulkanRender::initializeScene() {
+  // Initialize camera
+  float viewportWidth = (float)chain.extent.width;
+  float fov_deg = 60.0f;
+  float fov_rad = glm::radians(fov_deg);
+
+  float vp_dist = (viewportWidth * 0.5f) / tan(fov_rad * 0.5f);
+  compute.cameraUniform.vp_dist = vp_dist;
+  compute.cameraUniform.pos = glm::vec4(0.0f, 0.0f, -vp_dist, 1.0f);
+  compute.cameraUniform.view =
+      glm::lookAt(glm::vec3(0.f, 0.f, -vp_dist), glm::vec3(0.f, 0.f, -1.f),
+                  glm::vec3(0.f, 1.f, 0.f));
+
+  // Initialize spheres
+  compute.spheres.push_back({glm::vec4(0.f, 0.f, 2.f, 1.f), 2.f});
+
+  // Initialize planes
+  compute.planes.push_back({glm::vec4(-1.f, 3.f, 5.f, 1.f),
+                            glm::vec4(1.f, 0.f, 0.f, 0.f),
+                            glm::vec4(0.f, 1.f, 0.f, 0.f), 2.f, 2.f});
 }
 
 void VulkanRender::initializeBuffers() {
+
+  // Initialize Uniform
+  CameraPositionOperator camera_op(compute.cameraUniform);
+  camera_op.doOperation(compute.uniformBuffer, 0, allocator);
+
+  // Initialize SSBOs
   TauswortheOperator rd_op;
   MultiJitterOperator mj_op(chain.extent.width, chain.extent.height,
-                            compute.rays_per_pixel);
+                            compute.rays_per_pixel, compute.cameraUniform);
+
   rd_op.doOperation(compute.RNGbuffer, chain.extent.width * chain.extent.height,
                     allocator);
   mj_op.doOperation(compute.dataBuffer,
                     chain.extent.width * chain.extent.height, allocator);
+
+  SphereFillOperator sphere_op(compute.spheres);
+  PlaneFillOperator plane_op(compute.planes);
+
+  sphere_op.doOperation(compute.spheresBuffer, compute.spheres.size(),
+                        allocator);
+  plane_op.doOperation(compute.planesBuffer, compute.planes.size(), allocator);
 }
 
 void VulkanRender::updateShaderData(vk::CommandBuffer cmdBuffer) {
   // Update constant;
+  //
+  compute.constants.numPlanes = compute.planes.size();
+  compute.constants.numSpheres = compute.spheres.size();
+  compute.constants.numLights = 0;
+  compute.constants.rpp = compute.rays_per_pixel;
 
   cmdBuffer.pushConstants(compute.pipeline.layout,
                           vk::ShaderStageFlagBits::eCompute, 0,
@@ -256,9 +319,9 @@ void VulkanRender::drawFrame() {
   logicalDevice.resetFences(1, &inFlightFences[currentFrame]);
   uint32_t imageIdx = resImg.value;
 
-  ImGui_ImplVulkan_NewFrame(); // Vulkan state updates
-  ImGui_ImplGlfw_NewFrame();   // GLFW input processing
-  ImGui::NewFrame();           // Starts a new Dear ImGui frame
+  ImGui_ImplVulkan_NewFrame();
+  ImGui_ImplGlfw_NewFrame();
+  ImGui::NewFrame();
 
   showPerformanceMenu();
   showMenu();
@@ -574,13 +637,17 @@ void VulkanRender::createDescriptorSets() {
   rngBufferInfo.range =
       sizeof(Tracer::PRNG32) * chain.extent.width * chain.extent.height;
 
-  // vk::DescriptorImageInfo imageInfoB{};
-  // imageInfoB.imageView = compute.storageImg[1].view_;
-  // imageInfoB.imageLayout = compute.storageImg[1].currentLayout_;
+  vk::DescriptorBufferInfo spheresBufferInfo{};
+  spheresBufferInfo.buffer = compute.spheresBuffer.buffer;
+  spheresBufferInfo.offset = 0;
+  spheresBufferInfo.range = sizeof(Tracer::sphere) * compute.MAX_OBJECT_SIZE;
 
-  // for (int i = 0; i < 2; i++) {
+  vk::DescriptorBufferInfo planesBufferInfo{};
+  planesBufferInfo.buffer = compute.planesBuffer.buffer;
+  planesBufferInfo.offset = 0;
+  planesBufferInfo.range = sizeof(Tracer::plane) * compute.MAX_OBJECT_SIZE;
 
-  std::array<vk::WriteDescriptorSet, 4> descriptorWrites;
+  std::array<vk::WriteDescriptorSet, 6> descriptorWrites;
 
   descriptorWrites[0].sType = vk::StructureType::eWriteDescriptorSet;
   descriptorWrites[0].dstSet = compute.descriptorSet;
@@ -613,6 +680,22 @@ void VulkanRender::createDescriptorSets() {
   descriptorWrites[3].descriptorType = vk::DescriptorType::eStorageBuffer;
   descriptorWrites[3].descriptorCount = 1;
   descriptorWrites[3].pBufferInfo = &rngBufferInfo;
+
+  descriptorWrites[4].sType = vk::StructureType::eWriteDescriptorSet;
+  descriptorWrites[4].dstSet = compute.descriptorSet;
+  descriptorWrites[4].dstBinding = 4;
+  descriptorWrites[4].dstArrayElement = 0;
+  descriptorWrites[4].descriptorType = vk::DescriptorType::eStorageBuffer;
+  descriptorWrites[4].descriptorCount = 1;
+  descriptorWrites[4].pBufferInfo = &spheresBufferInfo;
+
+  descriptorWrites[5].sType = vk::StructureType::eWriteDescriptorSet;
+  descriptorWrites[5].dstSet = compute.descriptorSet;
+  descriptorWrites[5].dstBinding = 5;
+  descriptorWrites[5].dstArrayElement = 0;
+  descriptorWrites[5].descriptorType = vk::DescriptorType::eStorageBuffer;
+  descriptorWrites[5].descriptorCount = 1;
+  descriptorWrites[5].pBufferInfo = &planesBufferInfo;
 
   logicalDevice.updateDescriptorSets(descriptorWrites, nullptr);
 }
@@ -1456,9 +1539,23 @@ void VulkanRender::createDescriptorSetLayout() {
   rngLayoutBinding.stageFlags = vk::ShaderStageFlagBits::eCompute;
   rngLayoutBinding.pImmutableSamplers = nullptr;
 
+  vk::DescriptorSetLayoutBinding spheresLayoutBinding{};
+  spheresLayoutBinding.binding = 4;
+  spheresLayoutBinding.descriptorType = vk::DescriptorType::eStorageBuffer;
+  spheresLayoutBinding.descriptorCount = 1;
+  spheresLayoutBinding.stageFlags = vk::ShaderStageFlagBits::eCompute;
+  spheresLayoutBinding.pImmutableSamplers = nullptr;
+
+  vk::DescriptorSetLayoutBinding planesLayoutBinding{};
+  planesLayoutBinding.binding = 5;
+  planesLayoutBinding.descriptorType = vk::DescriptorType::eStorageBuffer;
+  planesLayoutBinding.descriptorCount = 1;
+  planesLayoutBinding.stageFlags = vk::ShaderStageFlagBits::eCompute;
+  planesLayoutBinding.pImmutableSamplers = nullptr;
+
   std::vector<vk::DescriptorSetLayoutBinding> bindings(
-      {uboLayoutBinding, ssboLayoutBinding, imgLayoutBinding,
-       rngLayoutBinding});
+      {uboLayoutBinding, ssboLayoutBinding, imgLayoutBinding, rngLayoutBinding,
+       spheresLayoutBinding, planesLayoutBinding});
 
   vk::DescriptorSetLayoutCreateInfo createInfo{};
   createInfo.sType = vk::StructureType::eDescriptorSetLayoutCreateInfo;
@@ -1499,7 +1596,7 @@ void VulkanRender::createPipeline() {
 }
 
 void VulkanRender::createDescriptorPool() {
-  std::array<vk::DescriptorPoolSize, 4> poolSizes = {};
+  std::array<vk::DescriptorPoolSize, 6> poolSizes = {};
 
   poolSizes[0].type = vk::DescriptorType::eUniformBuffer;
   poolSizes[0].descriptorCount = 1;
@@ -1512,6 +1609,12 @@ void VulkanRender::createDescriptorPool() {
 
   poolSizes[3].type = vk::DescriptorType::eStorageBuffer;
   poolSizes[3].descriptorCount = 1;
+
+  poolSizes[4].type = vk::DescriptorType::eStorageBuffer;
+  poolSizes[4].descriptorCount = 1;
+
+  poolSizes[5].type = vk::DescriptorType::eStorageBuffer;
+  poolSizes[5].descriptorCount = 1;
 
   vk::DescriptorPoolCreateInfo poolInfo{};
   poolInfo.sType = vk::StructureType::eDescriptorPoolCreateInfo;

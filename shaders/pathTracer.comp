@@ -11,6 +11,7 @@ struct HitData {
   vec4 normal;
   vec4 color;
   uint depth;
+  float t;
 };
 
 struct PRNG32 {
@@ -18,12 +19,25 @@ struct PRNG32 {
     float value;
 };
 
+struct Sphere{
+    vec4 center;
+    float radius;
+};
+
+struct Plane{
+  vec4 center;
+  vec4 edge1;
+  vec4 edge2;
+  float u;
+  float v;
+};
 // Bindings ------------------------------------------------------
 
-layout(set=0,binding = 0) uniform ViewProj {
+layout(set=0,binding = 0) uniform Camera {
   mat4 view;
-  mat4 proj;
-} view_proj;
+  vec4 pos;
+  float vp_dist;
+} camera;
 
 
 layout(std430, set = 0, binding = 1) buffer PixelData {
@@ -36,9 +50,22 @@ layout(std430, set = 0, binding = 3) buffer RNGBuffer{
     PRNG32 prng32[];
 };
 
+
+layout(std430, set = 0, binding = 4) buffer SpheresBuffer{
+    Sphere spheres[];
+};
+
+
+layout(std430, set = 0, binding = 5) buffer PlanesBuffer{
+    Plane planes[];
+};
+
 layout( push_constant ) uniform constants{
   vec4 test_color;
-  int rpp;
+  uint rpp;
+  uint numSpheres;
+  uint numPlanes;
+  uint numLights;
 } PushConstants;
 
 // Functions ----------------------------------------------------
@@ -87,7 +114,8 @@ void main() {
     vec4 color = vec4(0.0, 0.0, 0.0, 1.0); 
     ivec2 delta = pos - center;
     //if (dot(delta, delta) <= 100 * 100) {
-    	color = hit_data[index].color;
+    	//color = hit_data[index].color;
+	color = vec4(camera.vp_dist,camera.vp_dist,camera.vp_dist,0.0);
        //color = vec4(c0,c1,c2,1.0);
     //}
 

@@ -12,9 +12,11 @@ namespace Tracer {
       uint32_t pad[3];
     };
     
-    struct camera {
-      alignas(16) glm::mat4 view;
-      alignas(16) glm::mat4 proj;
+    struct alignas(16) camera {
+      glm::mat4 view;
+      glm::vec4 pos;
+      float vp_dist; 
+      uint32_t pad[3];
     };
     
     struct alignas(16) hitData {
@@ -24,21 +26,31 @@ namespace Tracer {
       glm::vec4 normal;
       glm::vec4 color;
       uint32_t depth;
-      uint32_t pad[3];
+      float t;
+      uint32_t pad[2];
     };
     
-    struct alignas(16) data {
-      uint32_t numSpheres;
-      uint32_t numPlanes;
-      uint32_t numLights;
-      uint32_t numRays;
-      uint32_t maxBounces;
+    struct alignas(16) sphere{
+      glm::vec4 center;
+      float radius;
       uint32_t pad[3];
     };
 
-    struct PushConstants {
+    struct alignas(16) plane{
+      glm::vec4 center;
+      glm::vec4 edge1;
+      glm::vec4 edge2;
+      float u;
+      float v;
+      uint32_t pad[2];
+    };
+
+    struct alignas(16) PushConstants {
       glm::vec4 test_color;
       uint32_t rpp;
+      uint32_t numSpheres;
+      uint32_t numPlanes;
+      uint32_t numLights;
     };
 }; // namespace tracer
 

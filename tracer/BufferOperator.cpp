@@ -1,4 +1,5 @@
 #include "BufferOperator.hpp"
+#include <glm/gtc/matrix_transform.hpp>
 
 void TauswortheOperator::doOperation(Buffer &buffer, size_t size,
                                      VmaAllocator allocator) {
@@ -18,33 +19,91 @@ void TauswortheOperator::doOperation(Buffer &buffer, size_t size,
   }
 }
 
-MultiJitterOperator::MultiJitterOperator(uint32_t width, uint32_t height, uint32_t rpp) : range(width,height), _rpp(rpp){}
+MultiJitterOperator::MultiJitterOperator(uint32_t width, uint32_t height,
+                                         uint32_t rpp,
+                                         const Tracer::camera &camera)
+    : range(width, height), _rpp(rpp), cam(camera) {}
 
 void MultiJitterOperator::doOperation(Buffer &buffer, size_t size,
-    VmaAllocator allocator) {
-
-  uint32_t interval = 5;
-
-  uint32_t swu = range.x / interval;
-  uint32_t shu = range.y / interval;
+                                      VmaAllocator allocator) {
 
   std::mt19937 gen(rd());
-  std::uniform_int_distribution<uint32_t> dist(
-      0, swu - 1);
+  std::uniform_real_distribution<float> dist(0.f, 1.f);
 
   auto *pHitData =
       reinterpret_cast<Tracer::hitData *>(buffer.allocationInfo.pMappedData);
 
-  for(uint32_t i = 0; i < (range.x-1) * (range.y-1) * _rpp; i += swu){
-    pHitData[i + dist(gen)].color = glm::vec4(0.0,0.0,1.0,1.0);
-    if(i % (range.x)  > 0)
-      pHitData[i].color = glm::vec4(1.0,1.0,1.0,1.0);
-    if(i >0 && i%(swu*swu*interval) == 0){
-      for(uint32_t j = i; j < i+range.x;j++){
-        pHitData[j].color = glm::vec4(1.0,1.0,1.0,1.0);
-      }
+  // Viewport pixel partitio size
+  uint32_t vpps = _rpp;
+
+  // Ensure vpps is perfect square and a power of 2
+  uint32_t root = static_cast<uint32_t>(std::sqrt(vpps));
+  assert(root * root == vpps && vpps != 0 && (vpps & (vpps - 1)) == 0);
+
+  float stride_minor = 1 / (float)vpps;
+  float stride_major = 1 / (float)range.x;
+  glm::vec4 upper_left(-range.x / 2.f, range.y / 2.f, -cam.vp_dist, 1.f);
+
+  for (uint32_t i = 0; i < range.x * range.y; i++) {
+    uint32_t c_major = i % range.x;
+    uint32_t r_major = i / range.x;
+    float x_major = upper_left.x + c_major * stride_major;
+    float y_major = upper_left.y - r_major * stride_major;
+    for (uint32_t j = 0; j < vpps; j++) {
+      uint32_t c_minor = j % root;
+      uint32_t r_minor = j / root;
+      float x_minor = x_major + c_minor * stride_minor;
+      float y_minor = y_major - r_minor * stride_minor;
+      glm::vec4 viewport_hit =
+          glm::vec4(x_minor + dist(gen) * stride_minor,
+                    y_minor - dist(gen) * stride_minor, -cam.vp_dist, 1.f);
+
+      pHitData[i * vpps + j].hit = viewport_hit;
+      pHitData[i * vpps + j].color = glm::vec4(0.0, 0.0, 1.0, 1.0);
+      pHitData[i * vpps + j].wo = glm::normalize(viewport_hit - cam.pos);
     }
   }
+}
 
+CameraPositionOperator::CameraPositionOperator(Tracer::camera &camera)
+    : _camera(camera) {}
 
+void CameraPositionOperator::doOperation(Buffer &buffer, size_t size,
+                                         VmaAllocator allocator) {
+  auto *pCamera =
+      reinterpret_cast<Tracer::camera *>(buffer.allocationInfo.pMappedData);
+
+  pCamera->pos = _camera.pos;
+  pCamera->view = _camera.view;
+  pCamera->vp_dist = _camera.vp_dist;
+}
+
+SphereFillOperator::SphereFillOperator(
+    const std::vector<Tracer::sphere> &spheres)
+    : _spheres(spheres) {}
+
+void SphereFillOperator::doOperation(Buffer &buffer, size_t size,
+                                     VmaAllocator allocator) {
+  auto *pSpheres =
+      reinterpret_cast<Tracer::sphere *>(buffer.allocationInfo.pMappedData);
+  for (uint32_t i = 0; i < _spheres.size(); i++) {
+    pSpheres[i].center = _spheres[i].center;
+    pSpheres[i].radius = _spheres[i].radius;
+  }
+}
+
+PlaneFillOperator::PlaneFillOperator(const std::vector<Tracer::plane> &planes)
+    : _planes(planes) {}
+
+void PlaneFillOperator::doOperation(Buffer &buffer, size_t size,
+                                    VmaAllocator allocator) {
+  auto *pPlanes =
+      reinterpret_cast<Tracer::plane *>(buffer.allocationInfo.pMappedData);
+  for (uint32_t i = 0; i < _planes.size(); i++) {
+    pPlanes[i].center = _planes[i].center;
+    pPlanes[i].edge1 = _planes[i].edge1;
+    pPlanes[i].edge2 = _planes[i].edge2;
+    pPlanes[i].u = _planes[i].u;
+    pPlanes[i].v = _planes[i].v;
+  }
 }
