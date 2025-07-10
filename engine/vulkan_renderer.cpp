@@ -291,6 +291,70 @@ void VulkanRender::initializeBuffers() {
   plane_op.doOperation(compute.planesBuffer, compute.planes.size(), allocator);
 }
 
+void VulkanRender::uploadToVRAM(Buffer buffer, const void *srcData) {
+
+  VkBuffer stagingBuffer;
+  VmaAllocation stagingAllocation;
+
+  VkBufferCreateInfo bufferInfo{};
+  bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+  bufferInfo.size = buffer.allocationInfo.size;
+  bufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+
+  VmaAllocationCreateInfo allocInfo{};
+  allocInfo.usage = VMA_MEMORY_USAGE_CPU_ONLY;
+  allocInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT |
+                    VMA_ALLOCATION_CREATE_MAPPED_BIT;
+
+  if (vmaCreateBuffer(allocator, &bufferInfo, &allocInfo, &stagingBuffer,
+                      &stagingAllocation, nullptr) != VK_SUCCESS) {
+    throw std::runtime_error("Failed to create staging buffer");
+  }
+
+  void *mapped = nullptr;
+  vmaMapMemory(allocator, stagingAllocation, &mapped);
+  std::memcpy(mapped, srcData, static_cast<size_t>(buffer.allocationInfo.size));
+  vmaUnmapMemory(allocator, stagingAllocation);
+
+  vk::CommandBufferAllocateInfo allocCmdInfo{};
+  allocCmdInfo.sType = vk::StructureType::eCommandBufferAllocateInfo;
+  allocCmdInfo.level = vk::CommandBufferLevel::ePrimary;
+  allocCmdInfo.commandPool = compute.commandPool;
+  allocCmdInfo.commandBufferCount = 1;
+
+  vk::CommandBuffer commandBuffer;
+  logicalDevice.allocateCommandBuffers(allocCmdInfo);
+
+  vk::CommandBufferBeginInfo beginInfo{};
+  beginInfo.sType = vk::StructureType::eCommandBufferBeginInfo;
+  beginInfo.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit;
+
+  commandBuffer.begin(&beginInfo);
+
+  vk::BufferCopy copyRegion{};
+  copyRegion.srcOffset = 0;
+  copyRegion.dstOffset = 0;
+  copyRegion.size = buffer.allocationInfo.size;
+
+  vk::Buffer stagingBufferWrapper = stagingBuffer;
+
+  commandBuffer.copyBuffer(stagingBufferWrapper, compute.dataBuffer.buffer, 1,
+                           &copyRegion);
+
+  commandBuffer.end();
+
+  vk::SubmitInfo submitInfo{};
+  submitInfo.sType = vk::StructureType::eSubmitInfo;
+  submitInfo.commandBufferCount = 1;
+  submitInfo.pCommandBuffers = &commandBuffer;
+
+  compute.queue.submit( submitInfo );
+  compute.queue.waitIdle();
+
+  logicalDevice.freeCommandBuffers(compute.commandPool, commandBuffer);
+  vmaDestroyBuffer(allocator, stagingBuffer, stagingAllocation);
+}
+
 void VulkanRender::updateShaderData(vk::CommandBuffer cmdBuffer) {
   // Update constant;
   //
@@ -324,7 +388,7 @@ void VulkanRender::drawFrame() {
   ImGui::NewFrame();
 
   showPerformanceMenu();
-  showMenu();
+  // showMenu();
 
   if (logicalDevice.getFenceStatus(compute.computeFence) ==
       vk::Result::eSuccess) {
@@ -1748,8 +1812,5 @@ void VulkanRender::showMenu() {
   ImGui::SliderInt("G", &g, 0, 255, "%d");
   ImGui::SliderInt("B", &b, 0, 255, "%d");
 
-  compute.constants.test_color.r = r;
-  compute.constants.test_color.g = g;
-  compute.constants.test_color.b = b;
   ImGui::End();
 }

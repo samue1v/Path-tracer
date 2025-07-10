@@ -64,7 +64,7 @@ public:
   // Resources for the compute part of the example
   struct Compute {
 
-    static constexpr uint32_t rays_per_pixel = 1;
+    static constexpr uint32_t rays_per_pixel = 256;
     static constexpr uint32_t MAX_OBJECT_SIZE = 20;
 
     vk::Queue queue;
@@ -308,6 +308,13 @@ private:
    * @brief Initialize buffer data if needed
    */
   void initializeBuffers();
+
+  /**
+   * @brief Uploads a buffer to VRAM
+   * @params Storage buffer object wrapper
+   * @params srcData data to be uploaded
+   */
+  void uploadToVRAM(Buffer buffer, const void *srcData);
 
   /**
    * @brief Initialize scene objects and camera

@@ -21,13 +21,17 @@ namespace Tracer {
     
     struct alignas(16) hitData {
       glm::vec4 wo;
-      glm::vec4 wi;
       glm::vec4 hit;
       glm::vec4 normal;
-      glm::vec4 color;
       uint32_t depth;
       float t;
       uint32_t pad[2];
+    };
+
+    struct alignas(16) pixelData{
+      glm::vec4 throughoutput;
+      uint32_t currentRay;
+      uint32_t pad[3];
     };
     
     struct alignas(16) sphere{
@@ -46,7 +50,6 @@ namespace Tracer {
     };
 
     struct alignas(16) PushConstants {
-      glm::vec4 test_color;
       uint32_t rpp;
       uint32_t numSpheres;
       uint32_t numPlanes;

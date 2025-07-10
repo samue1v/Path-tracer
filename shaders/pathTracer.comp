@@ -2,14 +2,25 @@
 
 layout(local_size_x = 16, local_size_y = 16) in;
 
-// Struct definition --------------------------------------------
+// Constant data definition ------------------------------------
+
+const float EPSILON = 1e-5;
+
+const float MAX_FLOAT = 3.4028235e38;
+const float MIN_FLOAT = -3.4028235e38;
+
+const uint null_shape   =  0x00000000u;
+const uint plane_shape  =  0x00000001u;
+const uint sphere_shape =  0x00000010u;
+
+const uint null_material = 0x00000000u;
+
+// Struct definition -------------------------------------------
 
 struct HitData {
   vec4 wo;
-  vec4 wi;
   vec4 hit;
   vec4 normal;
-  vec4 color;
   uint depth;
   float t;
 };
@@ -31,7 +42,7 @@ struct Plane{
   float u;
   float v;
 };
-// Bindings ------------------------------------------------------
+// Bindings ----------------------------------------------------
 
 layout(set=0,binding = 0) uniform Camera {
   mat4 view;
@@ -61,15 +72,13 @@ layout(std430, set = 0, binding = 5) buffer PlanesBuffer{
 };
 
 layout( push_constant ) uniform constants{
-  vec4 test_color;
   uint rpp;
   uint numSpheres;
   uint numPlanes;
   uint numLights;
 } PushConstants;
 
-// Functions ----------------------------------------------------
-
+// Functions ---------------------------------------------------
 
 uint TausStep(uint z, int S1, int S2, int S3, uint M)
 {
@@ -94,7 +103,73 @@ float random(inout PRNG32 rng)
     return rng.value;
 }
 
-// Main ---------------------------------------------------
+// Object intersection and shading -----------------------------
+
+bool intersectionTest(in Plane plane, out float t ,inout HitData hd){
+	//TODO provisory ...
+
+	vec3 e1 = plane.edge1.xyz;
+	vec3 e2 = plane.edge2.xyz;
+	vec3 center = plane.center.xyz;
+	vec3 rayOrigin = hd.hit.xyz;
+	vec3 rayDir = hd.wo.xyz;
+
+	vec3 normal = normalize(cross(e1, e2));
+	float denom = dot(normal, rayDir);
+
+    if (abs(denom) < EPSILON)
+        return false; // Ray is parallel to the plane
+
+    t = dot(center - rayOrigin, normal) / denom;
+
+    if (t < 0.0)
+        return false; // Intersection is behind the ray
+
+    vec3 hit = rayOrigin + t * rayDir;
+    vec3 local = hit - center;
+
+    float u = dot(local,e1); 
+    float v = dot(local,e2);
+
+    if (abs(u) > plane.u * 0.5 || abs(v) > plane.v * 0.5){
+        return false;
+	}
+
+    return true;
+}
+
+void fillHitData(in Plane plane,inout HitData hd){}
+
+bool Trace(inout HitData hd){
+	uint nearestIndex = 0;
+	uint nearestShape = null_shape;
+	float nearestT = MAX_FLOAT;
+	const uint max_iterations = max(PushConstants.numSpheres,PushConstants.numPlanes);
+
+	for(uint i = 0; i <max_iterations;++i){
+		if(i < PushConstants.numPlanes){
+			float hit_t;
+			bool does_hit= intersectionTest(planes[i],hit_t,hd);
+			if(does_hit && hit_t < nearestT){
+				nearestT = hit_t;
+				nearestIndex = i;
+				nearestShape = plane_shape;
+			}
+		}
+		//Next one
+	}
+
+	if(nearestShape == null_shape){
+		return false;
+	}
+
+	else if(nearestShape == plane_shape){
+		fillHitData(planes[nearestIndex],hd);
+	}
+	return bool(nearestShape);
+}
+
+// Main --------------------------------------------------------
 
 void main() {
     uvec2 gid = gl_GlobalInvocationID.xy;
@@ -115,7 +190,8 @@ void main() {
     ivec2 delta = pos - center;
     //if (dot(delta, delta) <= 100 * 100) {
     	//color = hit_data[index].color;
-	color = vec4(camera.vp_dist,camera.vp_dist,camera.vp_dist,0.0);
+	//color = vec4(camera.vp_dist,camera.vp_dist,camera.vp_dist,0.0);
+	color = vec4(0.0,0.0,0.0,1.0);
        //color = vec4(c0,c1,c2,1.0);
     //}
 
