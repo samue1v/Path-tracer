@@ -15,19 +15,25 @@ const uint sphere_shape =  0x00000010u;
 
 const uint null_material = 0x00000000u;
 
+const vec3 void_color = vec3(0.0,0.0,0.0);
+
+
 // Struct definition -------------------------------------------
 
 struct HitData {
   vec4 wo;
   vec4 hit;
   vec4 normal;
-  uint depth;
-  float t;
+  vec4 throughput_depth;
 };
 
 struct PRNG32 {
     uvec4 state;
     float value;
+};
+
+struct PixelData{
+	vec4 throughput_currentRay;
 };
 
 struct Sphere{
@@ -51,7 +57,7 @@ layout(set=0,binding = 0) uniform Camera {
 } camera;
 
 
-layout(std430, set = 0, binding = 1) buffer PixelData {
+layout(std430, set = 0, binding = 1) buffer HitDataBuffer {
     HitData hit_data[];
 };
 
@@ -71,12 +77,17 @@ layout(std430, set = 0, binding = 5) buffer PlanesBuffer{
     Plane planes[];
 };
 
-layout( push_constant ) uniform constants{
+
+layout(std430, set = 0, binding = 6) buffer PixelDataBuffer{
+	PixelData pixel_data[];
+};
+
+layout( push_constant ) uniform PushConstants{
   uint rpp;
   uint numSpheres;
   uint numPlanes;
   uint numLights;
-} PushConstants;
+} constants;
 
 // Functions ---------------------------------------------------
 
@@ -103,9 +114,13 @@ float random(inout PRNG32 rng)
     return rng.value;
 }
 
+// Helpers optimization ----------------------------------------
+
+float rRPP = 1.0/float(constants.rpp);
+
 // Object intersection and shading -----------------------------
 
-bool intersectionTest(in Plane plane, out float t ,inout HitData hd){
+bool intersectionTest(in Plane plane, out vec3 hit_p,out float t ,inout HitData hd){
 	//TODO provisory ...
 
 	vec3 e1 = plane.edge1.xyz;
@@ -114,7 +129,7 @@ bool intersectionTest(in Plane plane, out float t ,inout HitData hd){
 	vec3 rayOrigin = hd.hit.xyz;
 	vec3 rayDir = hd.wo.xyz;
 
-	vec3 normal = normalize(cross(e1, e2));
+	vec3 normal = normalize(cross(e1,e2));
 	float denom = dot(normal, rayDir);
 
     if (abs(denom) < EPSILON)
@@ -135,25 +150,34 @@ bool intersectionTest(in Plane plane, out float t ,inout HitData hd){
         return false;
 	}
 
+	hit_p = hit;
     return true;
 }
 
-void fillHitData(in Plane plane,inout HitData hd){}
+void fillHitData(in Plane plane,in vec3 hit,inout HitData hd){
+
+	hd.throughput_depth.xyz += vec3(1.0,1.0,1.0);
+	hd.hit.xyz = hit;
+	hd.normal.xyz = normalize(cross(plane.edge1.xyz,plane.edge2.xyz));
+}
 
 bool Trace(inout HitData hd){
 	uint nearestIndex = 0;
 	uint nearestShape = null_shape;
 	float nearestT = MAX_FLOAT;
-	const uint max_iterations = max(PushConstants.numSpheres,PushConstants.numPlanes);
+	vec3 nearestHitP;
+	const uint max_iterations = max(constants.numSpheres,constants.numPlanes);
 
 	for(uint i = 0; i <max_iterations;++i){
-		if(i < PushConstants.numPlanes){
+		if(i < constants.numPlanes){
 			float hit_t;
-			bool does_hit= intersectionTest(planes[i],hit_t,hd);
+			vec3 hit_p;
+			bool does_hit= intersectionTest(planes[i],hit_p,hit_t,hd);
 			if(does_hit && hit_t < nearestT){
 				nearestT = hit_t;
 				nearestIndex = i;
 				nearestShape = plane_shape;
+				nearestHitP = hit_p;
 			}
 		}
 		//Next one
@@ -164,7 +188,7 @@ bool Trace(inout HitData hd){
 	}
 
 	else if(nearestShape == plane_shape){
-		fillHitData(planes[nearestIndex],hd);
+		fillHitData(planes[nearestIndex],nearestHitP,hd);
 	}
 	return bool(nearestShape);
 }
@@ -175,29 +199,47 @@ void main() {
     uvec2 gid = gl_GlobalInvocationID.xy;
     ivec2 imageSize = imageSize(StorageImage);
     uint index = gid.y * imageSize.x + gid.x;
+	if(pixel_data[index].throughput_currentRay.w >= constants.rpp){
+		return;
+	}
 
-
+    uint hd_index = index*constants.rpp +uint( pixel_data[index].throughput_currentRay.w);
+	
+	// Acquired Data
+	HitData currentHitData = hit_data[hd_index];
     PRNG32 rng = prng32[index];
-    float c0 = random(rng);
-    float c1 = random(rng);
-    float c2 = random(rng);
 
+    //float c0 = random(rng);
+    //float c1 = random(rng);
+    //float c2 = random(rng);
+	//vec4 rd_color = vec4(c0,c1,c2,1.0);
 
+   
+   //vec4 color = vec4(pixel_data[index].throughput_currentRay.xyz,1.0); 
+	//color = rd_color + pixel_data[index].throughoutput;
+	vec4 color = vec4(void_color,1.0);
 
-    ivec2 pos = ivec2(gid);
-    ivec2 center = imageSize / 2;
-    vec4 color = vec4(0.0, 0.0, 0.0, 1.0); 
-    ivec2 delta = pos - center;
-    //if (dot(delta, delta) <= 100 * 100) {
-    	//color = hit_data[index].color;
-	//color = vec4(camera.vp_dist,camera.vp_dist,camera.vp_dist,0.0);
-	//color = vec4(0.0,0.0,0.0,1.0);
-       //color = vec4(c0,c1,c2,1.0);
-	   color = vec4(camera.pos.x,camera.pos.y,camera.pos.z,1.0);
-    //}
+	int maxDepth = 1; // TEMPORARY
 
+	// Trace scene
 
-    hit_data[index].depth += 1;
+    bool hitSomething = Trace(currentHitData);
+	color.xyz += currentHitData.throughput_depth.xyz;
+
+	// Update Buffers
+	//pixel_data[index].throughput_currentRay.xyz = color.xyz;
+	if(hit_data[hd_index].throughput_depth.w+1 >= maxDepth || !hitSomething){
+		pixel_data[index].throughput_currentRay.xyz += color.xyz*rRPP;
+		pixel_data[index].throughput_currentRay.w += 1;
+	}
+	else{
+		hit_data[hd_index].throughput_depth.w += 1;
+		hit_data[hd_index].throughput_depth.xyz = color.xyz;
+	}
     prng32[index] = rng;
-    imageStore(StorageImage, pos, color);
+	hit_data[hd_index] = currentHitData;
+	// Store image
+	vec4 newColor = vec4(pixel_data[index].throughput_currentRay.xyz,1.0);
+    ivec2 pos = ivec2(gid);
+    imageStore(StorageImage, pos,newColor );
 }

@@ -10,15 +10,22 @@ class BufferOperator {
 public:
   virtual ~BufferOperator() = default;
 
-  virtual void doOperation(vk::Device logicalDevice,
-                           vk::CommandPool cmdPool, vk::Queue queue,
-                           Buffer &buffer, size_t size,
+  /**
+   * @brief Do a preprocessing on buffer data
+   * @param logicalDevice Context VkDevice
+   * @param cmdPool Context VkCommandPool
+   * @param queue Context VkQueue to be submitted
+   * @param buffer Buffer to be processed
+   * @param size Size of buffer elements in element units
+   * @param allocator Context VMA allocator
+   */
+  virtual void doOperation(vk::Device logicalDevice, vk::CommandPool cmdPool,
+                           vk::Queue queue, Buffer &buffer, size_t size,
                            VmaAllocator allocator) = 0;
 
   void uploadToVRAM(vk::Device logicalDevice, vk::CommandPool cmdPool,
-                            vk::Queue queue, VmaAllocator allocator,
-                            Buffer &buffer, size_t size,
-                            const void *srcData);
+                    vk::Queue queue, VmaAllocator allocator, Buffer &buffer,
+                    size_t size, const void *srcData);
 };
 
 class TauswortheOperator : public BufferOperator {
@@ -87,6 +94,18 @@ public:
 
 public:
   const std::vector<Tracer::plane> &_planes;
+};
+
+class PixelFillOperator : public BufferOperator {
+
+public:
+  PixelFillOperator() = default;
+
+  void doOperation(vk::Device logicalDevice, vk::CommandPool cmdPool,
+                   vk::Queue queue, Buffer &buffer, size_t size,
+                   VmaAllocator allocator) override;
+
+public:
 };
 
 #endif

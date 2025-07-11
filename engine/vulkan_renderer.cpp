@@ -72,7 +72,9 @@ VulkanRender::~VulkanRender() {
 
   compute.uniformBuffer.cleanUp();
 
-  compute.dataBuffer.cleanUp();
+  compute.hitDataBuffer.cleanUp();
+
+  compute.pixelDataBuffer.cleanUp();
 
   compute.RNGbuffer.cleanUp();
 
@@ -213,8 +215,8 @@ void VulkanRender::createBufferResources() {
   bufferInfoData.size = sizeof(Tracer::hitData) * compute.rays_per_pixel *
                         chain.extent.width * chain.extent.height;
   bufferInfoData.sharingMode = vk::SharingMode::eExclusive;
-  compute.dataBuffer.create(logicalDevice, allocator, bufferInfoData,
-                            allocFlags);
+  compute.hitDataBuffer.create(logicalDevice, allocator, bufferInfoData,
+                               allocFlags);
 
   vk::BufferCreateInfo bufferInfoRNG{};
   bufferInfoRNG.sType = vk::StructureType::eBufferCreateInfo;
@@ -239,6 +241,15 @@ void VulkanRender::createBufferResources() {
   bufferInfoPlanes.sharingMode = vk::SharingMode::eExclusive;
   compute.planesBuffer.create(logicalDevice, allocator, bufferInfoPlanes,
                               allocFlags);
+
+  vk::BufferCreateInfo bufferInfoPixel{};
+  bufferInfoPixel.sType = vk::StructureType::eBufferCreateInfo;
+  bufferInfoPixel.usage = usageFlags;
+  bufferInfoPixel.size =
+      sizeof(Tracer::pixelData) * chain.extent.width * chain.extent.height;
+  bufferInfoPixel.sharingMode = vk::SharingMode::eExclusive;
+  compute.pixelDataBuffer.create(logicalDevice, allocator, bufferInfoPixel,
+                                 allocFlags);
 }
 
 void VulkanRender::initializeScene() {
@@ -249,18 +260,18 @@ void VulkanRender::initializeScene() {
 
   float vp_dist = (viewportWidth * 0.5f) / tan(fov_rad * 0.5f);
   compute.cameraUniform.vp_dist = vp_dist;
-  compute.cameraUniform.pos = glm::vec4(0.0f, 0.0f, -vp_dist, 1.0f);
+  compute.cameraUniform.pos = glm::vec4(0.0f, 0.0f, vp_dist, 1.0f);
   compute.cameraUniform.view =
-      glm::lookAt(glm::vec3(0.f, 0.f, -vp_dist), glm::vec3(0.f, 0.f, -1.f),
+      glm::lookAt(glm::vec3(0.f, 0.f, vp_dist), glm::vec3(0.f, 0.f, -1.f),
                   glm::vec3(0.f, 1.f, 0.f));
 
   // Initialize spheres
   compute.spheres.push_back({glm::vec4(0.f, 0.f, 2.f, 1.f), 2.f});
 
   // Initialize planes
-  compute.planes.push_back({glm::vec4(-1.f, 3.f, 5.f, 1.f),
+  compute.planes.push_back({glm::vec4(0.f, 0.f, -20.f, 1.f),
                             glm::vec4(1.f, 0.f, 0.f, 0.f),
-                            glm::vec4(0.f, 1.f, 0.f, 0.f), 2.f, 2.f});
+                            glm::vec4(0.f, 1.f, 0.f, 0.f), 100.f, 80.f});
 }
 
 void VulkanRender::initializeBuffers() {
@@ -269,6 +280,11 @@ void VulkanRender::initializeBuffers() {
   CameraPositionOperator camera_op(compute.cameraUniform);
   camera_op.doOperation(logicalDevice, compute.commandPool, compute.queue,
                         compute.uniformBuffer, 1, allocator);
+
+  PixelFillOperator pixel_op;
+  pixel_op.doOperation(logicalDevice, compute.commandPool, compute.queue,
+                       compute.pixelDataBuffer,
+                       chain.extent.width * chain.extent.height, allocator);
 
   // Initialize SSBOs
   TauswortheOperator rd_op;
@@ -279,7 +295,7 @@ void VulkanRender::initializeBuffers() {
                     compute.RNGbuffer, chain.extent.width * chain.extent.height,
                     allocator);
   mj_op.doOperation(
-      logicalDevice, compute.commandPool, compute.queue, compute.dataBuffer,
+      logicalDevice, compute.commandPool, compute.queue, compute.hitDataBuffer,
       chain.extent.width * chain.extent.height * compute.rays_per_pixel,
       allocator);
 
@@ -625,7 +641,7 @@ void VulkanRender::createDescriptorSets() {
   uniformBufferInfo.range = sizeof(Tracer::camera);
 
   vk::DescriptorBufferInfo storageBufferInfo{};
-  storageBufferInfo.buffer = compute.dataBuffer.buffer;
+  storageBufferInfo.buffer = compute.hitDataBuffer.buffer;
   storageBufferInfo.offset = 0;
   storageBufferInfo.range = sizeof(Tracer::hitData) * compute.rays_per_pixel *
                             chain.extent.width * chain.extent.height;
@@ -650,7 +666,13 @@ void VulkanRender::createDescriptorSets() {
   planesBufferInfo.offset = 0;
   planesBufferInfo.range = sizeof(Tracer::plane) * compute.MAX_OBJECT_SIZE;
 
-  std::array<vk::WriteDescriptorSet, 6> descriptorWrites;
+  vk::DescriptorBufferInfo pixelBufferInfo{};
+  pixelBufferInfo.buffer = compute.pixelDataBuffer.buffer;
+  pixelBufferInfo.offset = 0;
+  pixelBufferInfo.range =
+      sizeof(Tracer::pixelData) * chain.extent.width * chain.extent.height;
+
+  std::array<vk::WriteDescriptorSet, 7> descriptorWrites;
 
   descriptorWrites[0].sType = vk::StructureType::eWriteDescriptorSet;
   descriptorWrites[0].dstSet = compute.descriptorSet;
@@ -699,6 +721,14 @@ void VulkanRender::createDescriptorSets() {
   descriptorWrites[5].descriptorType = vk::DescriptorType::eStorageBuffer;
   descriptorWrites[5].descriptorCount = 1;
   descriptorWrites[5].pBufferInfo = &planesBufferInfo;
+
+  descriptorWrites[6].sType = vk::StructureType::eWriteDescriptorSet;
+  descriptorWrites[6].dstSet = compute.descriptorSet;
+  descriptorWrites[6].dstBinding = 6;
+  descriptorWrites[6].dstArrayElement = 0;
+  descriptorWrites[6].descriptorType = vk::DescriptorType::eStorageBuffer;
+  descriptorWrites[6].descriptorCount = 1;
+  descriptorWrites[6].pBufferInfo = &pixelBufferInfo;
 
   logicalDevice.updateDescriptorSets(descriptorWrites, nullptr);
 }
@@ -1561,9 +1591,16 @@ void VulkanRender::createDescriptorSetLayout() {
   planesLayoutBinding.stageFlags = vk::ShaderStageFlagBits::eCompute;
   planesLayoutBinding.pImmutableSamplers = nullptr;
 
+  vk::DescriptorSetLayoutBinding pixelLayoutBinding{};
+  pixelLayoutBinding.binding = 6;
+  pixelLayoutBinding.descriptorType = vk::DescriptorType::eStorageBuffer;
+  pixelLayoutBinding.descriptorCount = 1;
+  pixelLayoutBinding.stageFlags = vk::ShaderStageFlagBits::eCompute;
+  pixelLayoutBinding.pImmutableSamplers = nullptr;
+
   std::vector<vk::DescriptorSetLayoutBinding> bindings(
       {uboLayoutBinding, ssboLayoutBinding, imgLayoutBinding, rngLayoutBinding,
-       spheresLayoutBinding, planesLayoutBinding});
+       spheresLayoutBinding, planesLayoutBinding, pixelLayoutBinding});
 
   vk::DescriptorSetLayoutCreateInfo createInfo{};
   createInfo.sType = vk::StructureType::eDescriptorSetLayoutCreateInfo;
@@ -1604,7 +1641,7 @@ void VulkanRender::createPipeline() {
 }
 
 void VulkanRender::createDescriptorPool() {
-  std::array<vk::DescriptorPoolSize, 6> poolSizes = {};
+  std::array<vk::DescriptorPoolSize, 7> poolSizes = {};
 
   poolSizes[0].type = vk::DescriptorType::eUniformBuffer;
   poolSizes[0].descriptorCount = 1;
@@ -1623,6 +1660,9 @@ void VulkanRender::createDescriptorPool() {
 
   poolSizes[5].type = vk::DescriptorType::eStorageBuffer;
   poolSizes[5].descriptorCount = 1;
+
+  poolSizes[6].type = vk::DescriptorType::eStorageBuffer;
+  poolSizes[6].descriptorCount = 1;
 
   vk::DescriptorPoolCreateInfo poolInfo{};
   poolInfo.sType = vk::StructureType::eDescriptorPoolCreateInfo;

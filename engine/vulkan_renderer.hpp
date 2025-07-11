@@ -64,7 +64,7 @@ public:
   // Resources for the compute part of the example
   struct Compute {
 
-    static constexpr uint32_t rays_per_pixel = 4;
+    static constexpr uint32_t rays_per_pixel = 16 ;
     static constexpr uint32_t MAX_OBJECT_SIZE = 20;
 
     vk::Queue queue;
@@ -82,10 +82,11 @@ public:
     vk::CommandBuffer acquireBuffer, releaseBuffer;
 
     Buffer uniformBuffer;
-    Buffer dataBuffer;
+    Buffer hitDataBuffer;
     Buffer RNGbuffer;
     Buffer spheresBuffer;
     Buffer planesBuffer;
+    Buffer pixelDataBuffer;
 
     ResourceImage computeImg;
     Tracer::PushConstants constants;

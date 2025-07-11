@@ -22,16 +22,12 @@ namespace Tracer {
     struct alignas(16) hitData {
       glm::vec4 wo;
       glm::vec4 hit;
-      glm::vec4 normal;
-      uint32_t depth;
-      float t;
-      uint32_t pad[2];
+      glm::vec4 normal; 
+      glm::vec4 throughput_depth; // w coordinate is depth
     };
 
     struct alignas(16) pixelData{
-      glm::vec4 throughoutput;
-      uint32_t currentRay;
-      uint32_t pad[3];
+      glm::vec4 throughput_currentRay;
     };
     
     struct alignas(16) sphere{

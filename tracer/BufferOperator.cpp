@@ -1,6 +1,6 @@
 #include "BufferOperator.hpp"
-#include <glm/gtc/matrix_transform.hpp>
 #include "Logger.hpp"
+#include <glm/gtc/matrix_transform.hpp>
 
 void BufferOperator::uploadToVRAM(vk::Device logicalDevice,
                                   vk::CommandPool cmdPool, vk::Queue queue,
@@ -110,7 +110,7 @@ void MultiJitterOperator::doOperation(vk::Device logicalDevice,
 
   // Ensure vpps is perfect square and a power of 2
   uint32_t root = static_cast<uint32_t>(std::sqrt(vpps));
-  assert(root * root == vpps && vpps != 0 && (vpps & (vpps - 1)) == 0);
+  assert(root * root == vpps && vpps != 0); //&& (vpps & (vpps - 1)) == 0);
 
   float stride_minor = 1 / (float)vpps;
   float stride_major = 1 / (float)range.x;
@@ -132,6 +132,8 @@ void MultiJitterOperator::doOperation(vk::Device logicalDevice,
 
       pHitData[i * vpps + j].hit = viewport_hit;
       pHitData[i * vpps + j].wo = glm::normalize(viewport_hit - cam.pos);
+      pHitData[i * vpps + j].normal = glm::vec4(0.0,0.0,1.0,0.0);
+      pHitData[i * vpps + j].throughput_depth = glm::vec4(0.0,0.0,0.0,0.0);
     }
   }
 
@@ -151,7 +153,7 @@ void CameraPositionOperator::doOperation(vk::Device logicalDevice,
   pCamera[0].pos = _camera.pos;
   pCamera[0].view = _camera.view;
   pCamera[0].vp_dist = _camera.vp_dist;
-  
+
   uploadToVRAM(logicalDevice, cmdPool, queue, allocator, buffer,
                size * sizeof(Tracer::camera), pCamera.data());
 }
@@ -195,4 +197,18 @@ void PlaneFillOperator::doOperation(vk::Device logicalDevice,
 
   uploadToVRAM(logicalDevice, cmdPool, queue, allocator, buffer,
                size * sizeof(Tracer::plane), pPlanes.data());
+}
+
+void PixelFillOperator::doOperation(vk::Device logicalDevice,
+                                    vk::CommandPool cmdPool, vk::Queue queue,
+                                    Buffer &buffer, size_t size,
+                                    VmaAllocator allocator) {
+
+  std::vector<Tracer::pixelData> pPixelData(size);
+  for (uint32_t i = 0; i < size; ++i) {
+    pPixelData[i].throughput_currentRay = glm::vec4(0, 0, 0, 0);
+  }
+
+  uploadToVRAM(logicalDevice, cmdPool, queue, allocator, buffer,
+               size * sizeof(Tracer::pixelData), pPixelData.data());
 }
