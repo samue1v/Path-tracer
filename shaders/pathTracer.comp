@@ -191,8 +191,9 @@ void main() {
     //if (dot(delta, delta) <= 100 * 100) {
     	//color = hit_data[index].color;
 	//color = vec4(camera.vp_dist,camera.vp_dist,camera.vp_dist,0.0);
-	color = vec4(0.0,0.0,0.0,1.0);
+	//color = vec4(0.0,0.0,0.0,1.0);
        //color = vec4(c0,c1,c2,1.0);
+	   color = vec4(camera.pos.x,camera.pos.y,camera.pos.z,1.0);
     //}
 
 

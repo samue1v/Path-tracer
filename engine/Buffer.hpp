@@ -8,7 +8,7 @@ public:
   Buffer() = default;
   void create(vk::Device device, VmaAllocator allocator,
               vk::BufferCreateInfo bufferInfo,
-              VmaAllocationCreateFlags allocFlags);
+               VkMemoryPropertyFlags allocFlags);
   void cleanUp();
 
 public:
