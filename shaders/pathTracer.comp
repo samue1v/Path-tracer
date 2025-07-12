@@ -37,14 +37,15 @@ struct PixelData{
 };
 
 struct Sphere{
-    vec4 center;
-    float radius;
+    vec4 center_radius;
+    vec4 color;
 };
 
 struct Plane{
   vec4 center;
   vec4 edge1;
   vec4 edge2;
+  vec4 color;
   float u;
   float v;
 };
@@ -121,8 +122,6 @@ float rRPP = 1.0/float(constants.rpp);
 // Object intersection and shading -----------------------------
 
 bool intersectionTest(in Plane plane, out vec3 hit_p,out float t ,inout HitData hd){
-	//TODO provisory ...
-
 	vec3 e1 = plane.edge1.xyz;
 	vec3 e2 = plane.edge2.xyz;
 	vec3 center = plane.center.xyz;
@@ -146,7 +145,7 @@ bool intersectionTest(in Plane plane, out vec3 hit_p,out float t ,inout HitData 
     float u = dot(local,e1); 
     float v = dot(local,e2);
 
-    if (abs(u) > plane.u * 0.5 || abs(v) > plane.v * 0.5){
+    if (abs(u) > (plane.u * 0.5) || abs(v) > (plane.v * 0.5)){
         return false;
 	}
 
@@ -154,11 +153,43 @@ bool intersectionTest(in Plane plane, out vec3 hit_p,out float t ,inout HitData 
     return true;
 }
 
+bool intersectionTest(in Sphere sphere, out vec3 hit_p, out float t, inout HitData hd) {
+    vec3 rayOrigin = hd.hit.xyz;
+    vec3 rayDir = hd.wo.xyz;
+    vec3 oc = rayOrigin - sphere.center_radius.xyz;
+	float radius = sphere.center_radius.w;
+
+    float a = dot(rayDir, rayDir);
+    float b = 2.0 * dot(oc, rayDir);
+    float c = dot(oc, oc) - radius * radius;
+    float discriminant = b * b - 4.0 * a * c;
+
+    if (discriminant < 0.0)
+        return false;
+
+    float sqrtDisc = sqrt(discriminant);
+    float t0 = (-b - sqrtDisc) / (2.0 * a);
+    float t1 = (-b + sqrtDisc) / (2.0 * a);
+
+    t = (t0 > 0.0) ? t0 : t1;
+    if (t < 0.0)
+        return false;
+
+    hit_p = rayOrigin + t * rayDir;
+    return true;
+}
+
 void fillHitData(in Plane plane,in vec3 hit,inout HitData hd){
 
-	hd.throughput_depth.xyz += vec3(1.0,1.0,1.0);
+	hd.throughput_depth.xyz += plane.color.xyz;//vec3(1.0,1.0,1.0);
 	hd.hit.xyz = hit;
 	hd.normal.xyz = normalize(cross(plane.edge1.xyz,plane.edge2.xyz));
+}
+
+void fillHitData(in Sphere sphere, in vec3 hit_p, inout HitData hd) {
+    hd.hit.xyz = hit_p;
+    hd.normal.xyz = normalize(hit_p - sphere.center_radius.xyz);
+    hd.throughput_depth.xyz += sphere.color.xyz; // example
 }
 
 bool Trace(inout HitData hd){
@@ -167,8 +198,7 @@ bool Trace(inout HitData hd){
 	float nearestT = MAX_FLOAT;
 	vec3 nearestHitP;
 	const uint max_iterations = max(constants.numSpheres,constants.numPlanes);
-
-	for(uint i = 0; i <max_iterations;++i){
+	for(uint i = 0; i < max_iterations;++i){
 		if(i < constants.numPlanes){
 			float hit_t;
 			vec3 hit_p;
@@ -180,6 +210,18 @@ bool Trace(inout HitData hd){
 				nearestHitP = hit_p;
 			}
 		}
+		if(i < constants.numSpheres){
+            float hit_t;
+            vec3 hit_p;
+            bool does_hit= intersectionTest(spheres[i],hit_p,hit_t,hd);
+            if(does_hit && hit_t < nearestT){
+                nearestT = hit_t;
+                nearestIndex = i;
+                nearestShape = sphere_shape;
+                nearestHitP = hit_p;
+            }
+        }
+
 		//Next one
 	}
 
@@ -190,7 +232,11 @@ bool Trace(inout HitData hd){
 	else if(nearestShape == plane_shape){
 		fillHitData(planes[nearestIndex],nearestHitP,hd);
 	}
-	return bool(nearestShape);
+
+	else if(nearestShape == sphere_shape){
+		fillHitData(spheres[nearestIndex],nearestHitP,hd);
+	}
+	return true;
 }
 
 // Main --------------------------------------------------------
@@ -206,17 +252,10 @@ void main() {
     uint hd_index = index*constants.rpp +uint( pixel_data[index].throughput_currentRay.w);
 	
 	// Acquired Data
-	HitData currentHitData = hit_data[hd_index];
+	HitData currentHitData =  hit_data[hd_index];
+	//TESTE
     PRNG32 rng = prng32[index];
-
-    //float c0 = random(rng);
-    //float c1 = random(rng);
-    //float c2 = random(rng);
-	//vec4 rd_color = vec4(c0,c1,c2,1.0);
-
    
-   //vec4 color = vec4(pixel_data[index].throughput_currentRay.xyz,1.0); 
-	//color = rd_color + pixel_data[index].throughoutput;
 	vec4 color = vec4(void_color,1.0);
 
 	int maxDepth = 1; // TEMPORARY

@@ -266,12 +266,22 @@ void VulkanRender::initializeScene() {
                   glm::vec3(0.f, 1.f, 0.f));
 
   // Initialize spheres
-  compute.spheres.push_back({glm::vec4(0.f, 0.f, 2.f, 1.f), 2.f});
+  compute.spheres.push_back({glm::vec4(-50.f, -50.f, -24.f, 20.f),{141.f/256.f,245.f/256.f,66.f/256.f,1.f}});
 
   // Initialize planes
-  compute.planes.push_back({glm::vec4(0.f, 0.f, -20.f, 1.f),
+  compute.planes.push_back({glm::vec4(0.f, 0.f, -5.f, 1.f),
                             glm::vec4(1.f, 0.f, 0.f, 0.f),
-                            glm::vec4(0.f, 1.f, 0.f, 0.f), 100.f, 80.f});
+                            glm::vec4(0.f, 1.f, 0.f, 0.f),
+                            {0.58,0.58,0.58, 1.0},
+                            300.f,
+                            200.f});
+
+  compute.planes.push_back({glm::vec4(150.f, 100.f, -4.f, 1.f),
+                            glm::vec4(1.f, 0.f, 0.f, 0.f),
+                            glm::vec4(0.f, 1.f, 0.f, 0.f),
+                            {20.f / 256.f, 83.f / 256.f, 219.f / 256.f, 1.f},
+                            50.f,
+                            50.f});
 }
 
 void VulkanRender::initializeBuffers() {
@@ -377,7 +387,7 @@ void VulkanRender::drawFrame() {
       std::ostringstream oss;
       oss << std::put_time(&local_tm, "%Y-%m-%d %H:%M:%S");
 
-      // Logger::log(Logger::LogLevel::DEBUG, "Compute done at: " + oss.str());
+       Logger::log(Logger::LogLevel::DEBUG, "Compute done at: " + oss.str());
     }
     // logicalDevice.waitForFences(1,&compute.computeFence,1, UINT64_MAX);
   }

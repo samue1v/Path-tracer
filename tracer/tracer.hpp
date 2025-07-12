@@ -31,15 +31,15 @@ namespace Tracer {
     };
     
     struct alignas(16) sphere{
-      glm::vec4 center;
-      float radius;
-      uint32_t pad[3];
+      glm::vec4 center_radius;
+      glm::vec4 color;
     };
 
     struct alignas(16) plane{
       glm::vec4 center;
       glm::vec4 edge1;
       glm::vec4 edge2;
+      glm::vec4 color;
       float u;
       float v;
       uint32_t pad[2];

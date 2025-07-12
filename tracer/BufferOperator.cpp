@@ -73,6 +73,7 @@ void TauswortheOperator::doOperation(vk::Device logicalDevice,
                                      Buffer &buffer, size_t size,
                                      VmaAllocator allocator) {
   std::mt19937 gen(rd());
+  Logger::log(Logger::LogLevel::DEBUG, "R_DEVICE: " + std::to_string(rd()));
   std::uniform_int_distribution<uint32_t> dist(
       129, std::numeric_limits<uint32_t>::max());
 
@@ -99,6 +100,8 @@ void MultiJitterOperator::doOperation(vk::Device logicalDevice,
                                       vk::CommandPool cmdPool, vk::Queue queue,
                                       Buffer &buffer, size_t size,
                                       VmaAllocator allocator) {
+  Logger::log(Logger::LogLevel::DEBUG, "RANGE: " + std::to_string(range.x) +
+                                           "," + std::to_string(range.y));
 
   std::mt19937 gen(rd());
   std::uniform_real_distribution<float> dist(0.f, 1.f);
@@ -112,28 +115,35 @@ void MultiJitterOperator::doOperation(vk::Device logicalDevice,
   uint32_t root = static_cast<uint32_t>(std::sqrt(vpps));
   assert(root * root == vpps && vpps != 0); //&& (vpps & (vpps - 1)) == 0);
 
-  float stride_minor = 1 / (float)vpps;
-  float stride_major = 1 / (float)range.x;
-  glm::vec4 upper_left(-range.x / 2.f, range.y / 2.f, -cam.vp_dist, 1.f);
+  float stride_major = 1; /// or 1.0f / (float)range.x;
+  float stride_minor = stride_major / root;
+  glm::vec4 upper_left(-(float)range.x / 2.f, (float)range.y / 2.f, 0, 1.f);
 
   for (uint32_t i = 0; i < range.x * range.y; i++) {
     uint32_t c_major = i % range.x;
     uint32_t r_major = i / range.x;
-    float x_major = upper_left.x + c_major * stride_major;
-    float y_major = upper_left.y - r_major * stride_major;
+    float x_major = upper_left.x + (float)c_major * stride_major;
+    float y_major = upper_left.y - (float)r_major * stride_major;
+
     for (uint32_t j = 0; j < vpps; j++) {
       uint32_t c_minor = j % root;
       uint32_t r_minor = j / root;
-      float x_minor = x_major + c_minor * stride_minor;
-      float y_minor = y_major - r_minor * stride_minor;
-      glm::vec4 viewport_hit =
-          glm::vec4(x_minor + dist(gen) * stride_minor,
-                    y_minor - dist(gen) * stride_minor, -cam.vp_dist, 1.f);
 
-      pHitData[i * vpps + j].hit = viewport_hit;
+      float x_base =
+          x_major + (float)c_minor * stride_minor + stride_minor / 2.f;
+      float y_base = y_major - (float)r_minor * stride_minor -
+                     stride_minor / 2.f; 
+
+      float jitter_x = (dist(gen) - 0.5f) * stride_minor;
+      float jitter_y = (dist(gen) - 0.5f) * stride_minor;
+
+      glm::vec4 viewport_hit =
+          glm::vec4(x_base + jitter_x, y_base + jitter_y, 0, 1.f);
+
+      pHitData[i * vpps + j].hit = cam.pos;
       pHitData[i * vpps + j].wo = glm::normalize(viewport_hit - cam.pos);
-      pHitData[i * vpps + j].normal = glm::vec4(0.0,0.0,1.0,0.0);
-      pHitData[i * vpps + j].throughput_depth = glm::vec4(0.0,0.0,0.0,0.0);
+      pHitData[i * vpps + j].normal = glm::vec4(0.0, 0.0, 1.0, 0.0);
+      pHitData[i * vpps + j].throughput_depth = glm::vec4(0.0, 0.0, 0.0, 0.0);
     }
   }
 
@@ -169,8 +179,8 @@ void SphereFillOperator::doOperation(vk::Device logicalDevice,
 
   std::vector<Tracer::sphere> pSpheres(size);
   for (uint32_t i = 0; i < _spheres.size(); i++) {
-    pSpheres[i].center = _spheres[i].center;
-    pSpheres[i].radius = _spheres[i].radius;
+    pSpheres[i].center_radius = _spheres[i].center_radius;
+    pSpheres[i].color = _spheres[i].color;
   }
 
   uploadToVRAM(logicalDevice, cmdPool, queue, allocator, buffer,
@@ -193,6 +203,7 @@ void PlaneFillOperator::doOperation(vk::Device logicalDevice,
     pPlanes[i].edge2 = _planes[i].edge2;
     pPlanes[i].u = _planes[i].u;
     pPlanes[i].v = _planes[i].v;
+    pPlanes[i].color = _planes[i].color;
   }
 
   uploadToVRAM(logicalDevice, cmdPool, queue, allocator, buffer,
