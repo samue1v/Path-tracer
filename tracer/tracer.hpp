@@ -14,6 +14,7 @@ namespace Tracer {
     
     struct alignas(16) camera {
       glm::mat4 view;
+      glm::mat4 invView;
       glm::vec4 pos;
       float vp_dist; 
       uint32_t pad[3];

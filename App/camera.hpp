@@ -1,6 +1,8 @@
 #ifndef CAMERA_HPP
 #define CAMERA_HPP
 
+#include "tracer.hpp"
+#include <atomic>
 #include <glm/ext/matrix_clip_space.hpp>
 #include <glm/ext/matrix_projection.hpp>
 #include <glm/ext/matrix_transform.hpp>
@@ -14,17 +16,17 @@ static float ysens = .001f;
 
 class Camera {
 public:
-  Camera(glm::vec3 pos, glm::vec3 at, float aspect);
+  Camera(std::atomic<int> &readIndex,
+         std::atomic<int> &writeIndex,
+         std::array<Tracer::camera, 2> &bufferRef);
 
   void resetView();
 
   void updateView();
-  void updateProj();
 
   void update();
 
 public:
-
   glm::vec3 at;
   glm::vec3 pos;
   glm::vec3 right;
@@ -34,9 +36,10 @@ public:
   float pitch;
 
   float fov;
-  float near;
-  float far;
-  float aspect;
+
+  std::atomic<int> &readIndex;
+  std::atomic<int> &writeIndex;
+  std::array<Tracer::camera, 2> &buffer;
 };
 
 #endif // CAMERA_HPP

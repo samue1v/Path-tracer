@@ -1,16 +1,11 @@
 #include "camera.hpp"
 
-Camera::Camera(glm::vec3 _pos, glm::vec3 _at, float _aspect)
-    : pos(_pos), at(_at), aspect(_aspect) {
-  worldUp = glm::vec3(0., 1., 0.);
-  up = worldUp;
-  right = glm::vec3(1.);
-  yaw = -90.;
-  pitch = 0.;
-  fov = 45.;
-  near = 0.1;
-  far = 100.;
-  update();
+Camera::Camera(std::atomic<int> &_readIndex, std::atomic<int> &_writeIndex,
+               std::array<Tracer::camera, 2> &_bufferRef)
+    : readIndex(_readIndex), writeIndex(_writeIndex), buffer(_bufferRef) {
+
+  // Camera initial state.
+  resetView();
 }
 
 void Camera::resetView() {
@@ -23,15 +18,7 @@ void Camera::resetView() {
   update();
 }
 
-void Camera::update() {
-  updateView();
-  updateProj();
-}
+void Camera::update() { updateView(); }
 
 void Camera::updateView() {
   // TODO
-}
-
-void Camera::updateProj() {
-  //vp.proj = glm::perspective(glm::radians(fov), aspect, near, far);
-}

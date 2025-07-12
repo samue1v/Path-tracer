@@ -30,6 +30,7 @@ struct HitData {
 struct PRNG32 {
     uvec4 state;
     float value;
+	uvec3 _pad;
 };
 
 struct PixelData{
@@ -48,13 +49,16 @@ struct Plane{
   vec4 color;
   float u;
   float v;
+  vec2 _pad;
 };
 // Bindings ----------------------------------------------------
 
 layout(set=0,binding = 0) uniform Camera {
   mat4 view;
+  mat4 invView;
   vec4 pos;
   float vp_dist;
+  vec3 _pad;
 } camera;
 
 
@@ -253,6 +257,8 @@ void main() {
 	
 	// Acquired Data
 	HitData currentHitData =  hit_data[hd_index];
+	currentHitData.wo = camera.invView * currentHitData.wo;
+	currentHitData.hit = camera.invView * currentHitData.hit;
 	//TESTE
     PRNG32 rng = prng32[index];
    
@@ -272,8 +278,8 @@ void main() {
 		pixel_data[index].throughput_currentRay.w += 1;
 	}
 	else{
-		hit_data[hd_index].throughput_depth.w += 1;
-		hit_data[hd_index].throughput_depth.xyz = color.xyz;
+		currentHitData.throughput_depth.w += 1;
+		currentHitData.throughput_depth.xyz = color.xyz;
 	}
     prng32[index] = rng;
 	hit_data[hd_index] = currentHitData;

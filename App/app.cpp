@@ -1,10 +1,12 @@
 #include "app.hpp"
 
 void spawn_render_thread(GLFWwindow *window, VulkanRender *engine,
-                         std::atomic<bool> *done) {
+                         std::atomic<bool> *done, std::atomic<int> *readIndex,
+                         std::atomic<int> *writeIndex,
+                         std::array<Tracer::camera, 2> *matrices) {
   engine->init();
   engine->app = static_cast<App *>(glfwGetWindowUserPointer(window));
-  const int target_fps = 400;
+  const int target_fps = 144;
   const long opt_time = target_fps > 0 ? 1'000'000'000 / target_fps : 0;
 
   long last_fps_time = 0;
@@ -24,7 +26,6 @@ void spawn_render_thread(GLFWwindow *window, VulkanRender *engine,
       last_fps_time = 0;
       fps = 0;
     }
-    engine->updateState();
     engine->drawFrame();
     if (target_fps > 0) {
       auto sleepTime =
@@ -40,11 +41,12 @@ void spawn_render_thread(GLFWwindow *window, VulkanRender *engine,
   delete engine;
 }
 
-App::App(GLFWwindow *window) : window(window), logger(Logger::getInstance()) {
+App::App(GLFWwindow *window)
+    : window(window), logger(Logger::getInstance()),
+      camera(readIndex, writeIndex,
+             camera_buffer) {
 
   engine = new VulkanRender(window);
-  engine->renderCommands = &renderCommands;
-  engine->renderQueueMutex = &renderQueueMutex;
   this->mainQueueMutex = &(engine->mainQueueMutex);
   this->mainCommands = &(engine->mainCommands);
 }
@@ -56,7 +58,8 @@ void App::run() {
 
   std::atomic<bool> done = false;
   glfwSetWindowUserPointer(window, this);
-  std::thread render_thread(spawn_render_thread, window, engine, &done);
+  std::thread render_thread(spawn_render_thread, window, engine, &done,
+                            &readIndex, &writeIndex, &camera_buffer);
 
   main_loop();
   done = true;

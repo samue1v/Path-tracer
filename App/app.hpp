@@ -1,5 +1,6 @@
 #ifndef APP_HPP
 #define APP_HPP
+#include "Logger.hpp"
 #include "config.hpp"
 #include "glfw_backend.hpp"
 #include "vulkan_renderer.hpp"
@@ -9,8 +10,7 @@
 #include <iostream>
 #include <mutex>
 #include <thread>
-#include "Logger.hpp"
-
+#include <camera.hpp>
 
 /**
  * @brief The main program.
@@ -34,7 +34,6 @@ public:
    * @param name mesh name
    */
   void uploadMesh(std::string name);
-                 
 
 private:
   /**
@@ -67,18 +66,21 @@ private:
    */
   GLFWwindow *window;
 
-  std::queue<std::function<void()>> renderCommands;
-  std::mutex renderQueueMutex;
+  std::queue<std::function<void()>> *mainCommands;
+  std::mutex *mainQueueMutex;
 
-
-  std::queue<std::function<void()>> * mainCommands;
-  std::mutex * mainQueueMutex;
-
-  Logger & logger;
+  Logger &logger;
 
 public:
-
   VulkanRender *engine;
+  double lastX;
+  double lastY;
+  bool mouseDragging;
+
+  std::atomic<int> readIndex;
+  std::atomic<int> writeIndex;
+  std::array<Tracer::camera, 2> camera_buffer;
+  Camera camera;
 };
 
 #endif

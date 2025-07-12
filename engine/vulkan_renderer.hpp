@@ -64,7 +64,7 @@ public:
   // Resources for the compute part of the example
   struct Compute {
 
-    static constexpr uint32_t rays_per_pixel = 121 ;
+    static constexpr uint32_t rays_per_pixel = 25 ;
     static constexpr uint32_t MAX_OBJECT_SIZE = 20;
 
     vk::Queue queue;
@@ -97,7 +97,7 @@ public:
     vk::Fence computeFence;
     vk::Semaphore computeFinishedSemaphore; // Framesinflight = 3
     vk::Semaphore acquireSemaphore, releaseSemaphore;
-    uint32_t currentComputeBuffer = 0;
+    bool cameraMoved = false;
 
   } compute;
   /**
@@ -161,9 +161,6 @@ public:
   void updateShaderData(vk::CommandBuffer cmdBuffer);
 
 public:
-  std::queue<std::function<void()>> *renderCommands;
-  std::mutex *renderQueueMutex;
-
   std::queue<std::function<void()>> mainCommands;
   std::mutex mainQueueMutex;
 

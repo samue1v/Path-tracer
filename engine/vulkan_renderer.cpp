@@ -264,24 +264,24 @@ void VulkanRender::initializeScene() {
   compute.cameraUniform.view =
       glm::lookAt(glm::vec3(0.f, 0.f, vp_dist), glm::vec3(0.f, 0.f, -1.f),
                   glm::vec3(0.f, 1.f, 0.f));
-
+  compute.cameraUniform.invView = glm::inverse(compute.cameraUniform.view);
   // Initialize spheres
-  compute.spheres.push_back({glm::vec4(-50.f, -50.f, -24.f, 20.f),{141.f/256.f,245.f/256.f,66.f/256.f,1.f}});
-
+//  compute.spheres.push_back({glm::vec4(0.f, 0.f, -21.f, 20.f),{141.f/256.f,245.f/256.f,66.f/256.f,1.f}});
+//
   // Initialize planes
-  compute.planes.push_back({glm::vec4(0.f, 0.f, -5.f, 1.f),
+  compute.planes.push_back({glm::vec4(0.f, 0.f, -200.f, 1.f),
                             glm::vec4(1.f, 0.f, 0.f, 0.f),
                             glm::vec4(0.f, 1.f, 0.f, 0.f),
                             {0.58,0.58,0.58, 1.0},
-                            300.f,
-                            200.f});
+                            630.f,
+                            630.f});
 
-  compute.planes.push_back({glm::vec4(150.f, 100.f, -4.f, 1.f),
+  compute.planes.push_back({glm::vec4(0.f, 0.f, -190.f, 1.f),
                             glm::vec4(1.f, 0.f, 0.f, 0.f),
                             glm::vec4(0.f, 1.f, 0.f, 0.f),
                             {20.f / 256.f, 83.f / 256.f, 219.f / 256.f, 1.f},
-                            50.f,
-                            50.f});
+                            350.f,
+                            350.f});
 }
 
 void VulkanRender::initializeBuffers() {
@@ -290,11 +290,6 @@ void VulkanRender::initializeBuffers() {
   CameraPositionOperator camera_op(compute.cameraUniform);
   camera_op.doOperation(logicalDevice, compute.commandPool, compute.queue,
                         compute.uniformBuffer, 1, allocator);
-
-  PixelFillOperator pixel_op;
-  pixel_op.doOperation(logicalDevice, compute.commandPool, compute.queue,
-                       compute.pixelDataBuffer,
-                       chain.extent.width * chain.extent.height, allocator);
 
   // Initialize SSBOs
   TauswortheOperator rd_op;
@@ -308,6 +303,13 @@ void VulkanRender::initializeBuffers() {
       logicalDevice, compute.commandPool, compute.queue, compute.hitDataBuffer,
       chain.extent.width * chain.extent.height * compute.rays_per_pixel,
       allocator);
+
+
+
+  PixelFillOperator pixel_op;
+  pixel_op.doOperation(logicalDevice, compute.commandPool, compute.queue,
+                       compute.pixelDataBuffer,
+                       chain.extent.width * chain.extent.height, allocator);
 
   SphereFillOperator sphere_op(compute.spheres);
   PlaneFillOperator plane_op(compute.planes);
@@ -1781,19 +1783,6 @@ void VulkanRender::showPerformanceMenu() {
   ImGui::SetWindowPos(ImVec2(0, 0), ImGuiCond_Always);
   ImGui::Text("FPS: %d", currentFPS);
   ImGui::End();
-}
-
-void VulkanRender::updateState() {
-  std::function<void()> command;
-  {
-    std::lock_guard<std::mutex> lock(*renderQueueMutex);
-    if (!renderCommands->empty()) {
-      command = renderCommands->front();
-      renderCommands->pop();
-    }
-  }
-  if (command)
-    command();
 }
 
 void VulkanRender::showMenu() {
