@@ -259,29 +259,147 @@ void VulkanRender::initializeScene() {
   float fov_rad = glm::radians(fov_deg);
 
   float vp_dist = (viewportWidth * 0.5f) / tan(fov_rad * 0.5f);
-  compute.cameraUniform.vp_dist = vp_dist;
   compute.cameraUniform.pos = glm::vec4(0.0f, 0.0f, vp_dist, 1.0f);
   compute.cameraUniform.view =
       glm::lookAt(glm::vec3(0.f, 0.f, vp_dist), glm::vec3(0.f, 0.f, -1.f),
                   glm::vec3(0.f, 1.f, 0.f));
   compute.cameraUniform.invView = glm::inverse(compute.cameraUniform.view);
   // Initialize spheres
-//  compute.spheres.push_back({glm::vec4(0.f, 0.f, -21.f, 20.f),{141.f/256.f,245.f/256.f,66.f/256.f,1.f}});
-//
-  // Initialize planes
-  compute.planes.push_back({glm::vec4(0.f, 0.f, -200.f, 1.f),
-                            glm::vec4(1.f, 0.f, 0.f, 0.f),
-                            glm::vec4(0.f, 1.f, 0.f, 0.f),
-                            {0.58,0.58,0.58, 1.0},
-                            630.f,
-                            630.f});
+  // compute.spheres.push_back(
+  //    {glm::vec4(0.f, 0.f, -21.f, 20.f),
+  //     {141.f / 256.f, 245.f / 256.f, 66.f / 256.f, 1.f}});
 
-  compute.planes.push_back({glm::vec4(0.f, 0.f, -190.f, 1.f),
+  //// Initialize planes
+  // compute.planes.push_back({glm::vec4(0.f, 0.f, -200.f, 1.f),
+  //                           glm::vec4(1.f, 0.f, 0.f, 0.f),
+  //                           glm::vec4(0.f, 1.f, 0.f, 0.f),
+  //                           {0.58, 0.58, 0.58, 1.0},
+  //                           630.f,
+  //                           630.f});
+
+  // compute.planes.push_back({glm::vec4(0.f, 0.f, -190.f, 1.f),
+  //                           glm::vec4(1.f, 0.f, 0.f, 0.f),
+  //                           glm::vec4(0.f, 1.f, 0.f, 0.f),
+  //                           {20.f / 256.f, 83.f / 256.f, 219.f / 256.f, 1.f},
+  //                           350.f,
+  //                           350.f});
+
+  //// Center sphere (white diffuse)
+  // compute.spheres.push_back({
+  //     glm::vec4(0.f, -250.f, -800.f, 150.f), // position + radius
+  //     {1.f, 1.f, 1.f, 1.f}                   // white (B,G,R)
+  // });
+  //
+  //// Floor (gray)
+  // compute.planes.push_back({
+  //     glm::vec4(0.f, -320.f, -800.f, 1.f),   // center
+  //     glm::vec4(1.f, 0.f, 0.f, 0.f),         // edge1 (X)
+  //     glm::vec4(0.f, 0.f, 1.f, 0.f),         // edge2 (Z)
+  //     {0.6f, 0.6f, 0.6f, 1.0f},              // gray (B,G,R)
+  //     640.f,
+  //     640.f
+  // });
+  //
+  //// Ceiling (gray)
+  // compute.planes.push_back({
+  //     glm::vec4(0.f, 320.f, -800.f, 1.f),
+  //     glm::vec4(1.f, 0.f, 0.f, 0.f),
+  //     glm::vec4(0.f, 0.f, 1.f, 0.f),
+  //     {0.6f, 0.6f, 0.6f, 1.0f},
+  //     640.f,
+  //     640.f
+  // });
+  //
+  //// Back wall (gray)
+  // compute.planes.push_back({
+  //     glm::vec4(0.f, 0.f, -1120.f, 1.f),
+  //     glm::vec4(1.f, 0.f, 0.f, 0.f),
+  //     glm::vec4(0.f, 1.f, 0.f, 0.f),
+  //     {0.6f, 0.6f, 0.6f, 1.0f},
+  //     640.f,
+  //     640.f
+  // });
+  //
+  //// Left wall (red in BGR means high R is last, so red is (0,0,1))
+  // compute.planes.push_back({
+  //     glm::vec4(-320.f, 0.f, -800.f, 1.f),
+  //     glm::vec4(0.f, 0.f, 1.f, 0.f),
+  //     glm::vec4(0.f, 1.f, 0.f, 0.f),
+  //     {0.0f, 0.0f, 0.8f, 1.0f},  // Red (B=0,G=0,R=0.8)
+  //     640.f,
+  //     640.f
+  // });
+  //
+  //// Right wall (green in BGR means green is middle)
+  // compute.planes.push_back({
+  //     glm::vec4(320.f, 0.f, -800.f, 1.f),
+  //     glm::vec4(0.f, 0.f, 1.f, 0.f),
+  //     glm::vec4(0.f, 1.f, 0.f, 0.f),
+  //     {0.0f, 0.8f, 0.0f, 1.0f},  // Green (B=0,G=0.8,R=0)
+  //     640.f,
+  //     640.f
+  // });
+  //
+
+  // Floor (chão)
+  compute.planes.push_back({
+      glm::vec4(0.f, -320.f, 0.f, 1.f), // Center
+      glm::vec4(1.f, 0.f, 0.f, 0.f),    // edge1 = X
+      glm::vec4(0.f, 0.f, 1.f, 0.f),    // edge2 = Z
+      {0.6f, 0.6f, 0.6f, 1.0f},         // Gray
+      640.f,                            // Full width in X
+      1280.f                            // Full depth in Z (from -640 to +640)
+
+  });
+  // Ceiling (teto)
+  compute.planes.push_back({glm::vec4(0.f, 320.f, 0.f, 1.f),
+                            glm::vec4(1.f, 0.f, 0.f, 0.f),
+                            glm::vec4(0.f, 0.f, 1.f, 0.f),
+                            {0.6f, 0.6f, 0.6f, 1.0f},
+                            640.f,
+                            1280.f});
+
+  // Back wall (fundo da caixa)
+  compute.planes.push_back({glm::vec4(0.f, 0.f, -640.f, 1.f),
                             glm::vec4(1.f, 0.f, 0.f, 0.f),
                             glm::vec4(0.f, 1.f, 0.f, 0.f),
-                            {20.f / 256.f, 83.f / 256.f, 219.f / 256.f, 1.f},
-                            350.f,
-                            350.f});
+                            {0.6f, 0.6f, 0.6f, 1.0f},
+                            640.f,
+                            640.f});
+
+  // Left wall (parede esquerda)
+  compute.planes.push_back({glm::vec4(-320.f, 0.f, 0.f, 1.f),
+                            glm::vec4(0.f, 0.f, 1.f, 0.f),
+                            glm::vec4(0.f, 1.f, 0.f, 0.f),
+                            {0.0f, 0.0f, 0.8f, 1.0f},
+                            1280.f,
+                            640.f});
+
+  // Right wall (parede direita)
+  compute.planes.push_back({glm::vec4(320.f, 0.f, 0.f, 1.f),
+                            glm::vec4(0.f, 0.f, 1.f, 0.f),
+                            glm::vec4(0.f, 1.f, 0.f, 0.f),
+                            {0.0f, 0.8f, 0.0f, 1.0f},
+                            1280.f,
+                            640.f});
+
+  // Front wall (parede atrás da câmera)
+  compute.planes.push_back({glm::vec4(0.f, 0.f, 640.f, 1.f),
+                            glm::vec4(1.f, 0.f, 0.f, 0.f),
+                            glm::vec4(0.f, 1.f, 0.f, 0.f),
+                            {0.6f, 0.6f, 0.6f, 1.0f},
+                            640.f,
+                            640.f});
+
+  compute.spheres.push_back({
+      glm::vec4(-240.f, -240.f, -560.f, 80.f), // position (x, y, z) + radius
+      {1.f, 1.f, 1.f, 1.f}                     // white color in BGR
+  });
+
+  compute.spheres.push_back({
+      glm::vec4(0.f, 0.f, -600.f, 80.f), // center + radius
+      {0.0f, 0.8f, 0.8f, 1.0f}           // Cyan-ish color (BGR)
+  });
 }
 
 void VulkanRender::initializeBuffers() {
@@ -303,8 +421,6 @@ void VulkanRender::initializeBuffers() {
       logicalDevice, compute.commandPool, compute.queue, compute.hitDataBuffer,
       chain.extent.width * chain.extent.height * compute.rays_per_pixel,
       allocator);
-
-
 
   PixelFillOperator pixel_op;
   pixel_op.doOperation(logicalDevice, compute.commandPool, compute.queue,
@@ -389,7 +505,7 @@ void VulkanRender::drawFrame() {
       std::ostringstream oss;
       oss << std::put_time(&local_tm, "%Y-%m-%d %H:%M:%S");
 
-       Logger::log(Logger::LogLevel::DEBUG, "Compute done at: " + oss.str());
+      Logger::log(Logger::LogLevel::DEBUG, "Compute done at: " + oss.str());
     }
     // logicalDevice.waitForFences(1,&compute.computeFence,1, UINT64_MAX);
   }

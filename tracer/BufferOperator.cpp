@@ -167,11 +167,8 @@ void CameraPositionOperator::doOperation(vk::Device logicalDevice,
 
   pCamera[0].pos = _camera.pos;
   pCamera[0].view = _camera.view;
-  pCamera[0].vp_dist = _camera.vp_dist;
-  pCamera[0].invView = glm::inverse(_camera.view);
-  pCamera[0].pad[0] = 0;
-  pCamera[0].pad[1] = 0;
-  pCamera[0].pad[2] = 0;
+  pCamera[0].invView = _camera.invView;
+;
 
   uploadToVRAM(logicalDevice, cmdPool, queue, allocator, buffer,
                size * sizeof(Tracer::camera), pCamera.data());

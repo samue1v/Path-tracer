@@ -3,6 +3,7 @@
 
 #include "tracer.hpp"
 #include <atomic>
+#include <GLFW/glfw3.h>
 #include <glm/ext/matrix_clip_space.hpp>
 #include <glm/ext/matrix_projection.hpp>
 #include <glm/ext/matrix_transform.hpp>
@@ -16,14 +17,24 @@ static float ysens = .001f;
 
 class Camera {
 public:
-  Camera(std::atomic<int> &readIndex,
+  Camera(GLFWwindow * glfw_window, std::atomic<int> &readIndex,
          std::atomic<int> &writeIndex,
          std::array<Tracer::camera, 2> &bufferRef);
 
+  /**
+   * @brief Reset camera top initial state
+   */
   void resetView();
 
+  /**
+   * @brief Update Tracer::camera scene camera from current pos, at and up
+   * parameters
+   */
   void updateView();
 
+  /**
+   * @brief Update and Sync logic
+   */
   void update();
 
 public:
@@ -31,7 +42,7 @@ public:
   glm::vec3 pos;
   glm::vec3 right;
   glm::vec3 up;
-  glm::vec3 worldUp;
+  glm::ivec2 vp_size;
   float yaw;
   float pitch;
 
@@ -40,6 +51,7 @@ public:
   std::atomic<int> &readIndex;
   std::atomic<int> &writeIndex;
   std::array<Tracer::camera, 2> &buffer;
+  Tracer::camera camera;
 };
 
 #endif // CAMERA_HPP

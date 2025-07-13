@@ -43,8 +43,7 @@ void spawn_render_thread(GLFWwindow *window, VulkanRender *engine,
 
 App::App(GLFWwindow *window)
     : window(window), logger(Logger::getInstance()),
-      camera(readIndex, writeIndex,
-             camera_buffer) {
+      camera(window, readIndex, writeIndex, camera_buffer) {
 
   engine = new VulkanRender(window);
   this->mainQueueMutex = &(engine->mainQueueMutex);
