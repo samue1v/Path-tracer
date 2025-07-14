@@ -207,11 +207,11 @@ void PlaneFillOperator::doOperation(vk::Device logicalDevice,
     pPlanes[i].center = _planes[i].center;
     pPlanes[i].edge1 = _planes[i].edge1;
     pPlanes[i].edge2 = _planes[i].edge2;
+    pPlanes[i].color = _planes[i].color;
     pPlanes[i].u = _planes[i].u;
     pPlanes[i].v = _planes[i].v;
     pPlanes[i].pad[0] = 0;
     pPlanes[i].pad[1] = 0;
-    pPlanes[i].color = _planes[i].color;
   }
 
   uploadToVRAM(logicalDevice, cmdPool, queue, allocator, buffer,

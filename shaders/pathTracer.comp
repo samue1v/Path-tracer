@@ -17,8 +17,15 @@ const uint null_material = 0x00000000u;
 
 const vec3 void_color = vec3(0.0,0.0,0.0);
 
+const float Pi      = 3.1415927;
+const float InvPi   = 0.3183099;
+const float Inv2Pi  = 0.1591549;
+const float Inv4Pi  = 0.0795775;
+const float PiOver2 = 1.5707963;
+const float PiOver4 = 0.7853982;
+const float Sqrt2   = 1.4142136;
 
-// Struct definition -------------------------------------------
+// CPU Struct definition -------------------------------------------
 
 struct HitData {
   vec4 wo;
@@ -37,6 +44,14 @@ struct PixelData{
 	vec4 throughput_currentRay;
 };
 
+
+struct Material{
+ vec4 albedo_refractiveIdx;
+ vec4 emissive_reflectiveIdx;
+ uint type;
+ uvec3 _pad;
+};
+
 struct Sphere{
     vec4 center_radius;
     vec4 color;
@@ -51,6 +66,15 @@ struct Plane{
   float v;
   vec2 _pad;
 };
+
+
+// GPU Struct definition
+
+struct Sample{
+	vec3 dir;
+	float pdf;
+};
+
 // Bindings ----------------------------------------------------
 
 layout(set=0,binding = 0) uniform Camera {
@@ -117,13 +141,65 @@ float random(inout PRNG32 rng)
     return rng.value;
 }
 
+vec2 sampleDisk(in float u,in float v){
+	float uOffset = 2.*u - 1.;
+	float vOffset = 2.*v - 1.;
+
+	if(abs(uOffset) < EPSILON && abs(vOffset) < EPSILON){
+		return vec2(0.,0.);
+	}
+
+	float theta, r;
+	if (abs(uOffset) > abs(vOffset)) {
+          r = uOffset;
+          theta = PiOver4 * (vOffset / uOffset);
+	}
+	else {
+    	r = vOffset;
+        theta = PiOver2 - PiOver4 * (uOffset / vOffset);
+    }
+	return r * vec2(cos(theta), (theta));
+}
+
+float cosHemispherePDF(in float cosTheta){
+	return InvPi*cosTheta;
+}
+
+vec3 cosSampleHemisphere(in float u, in float v){
+	vec2 d = sampleDisk(u,v);
+	float z = sqrt(max(0.0, 1 - d.x * d.x - d.y * d.y));
+	return vec3(d.x,z,d.y);
+}
+
+mat3 buildTangentBasis(in vec3 normal) {
+    vec3 up = abs(normal.y) < 0.999 ? vec3(0., 1., 0.) : vec3(1., 0., 0.);
+    vec3 tangent = normalize(cross(up, normal));
+    vec3 bitangent = cross(normal, tangent);
+    return mat3(tangent, normal, bitangent); // Tangent-space to world-space
+}
+
+Sample sampleDiffuse(in vec3 worldNormal, inout PRNG32 rng) {
+    float u1 = random(rng);
+    float u2 = random(rng);
+
+    vec3 local = cosSampleHemisphere(u1, u2);
+    mat3 TNB = buildTangentBasis(worldNormal);
+    vec3 worldDir = normalize(TNB * local);
+
+    Sample s;
+    s.dir = worldDir;
+    s.pdf = cosHemispherePDF(max(dot(worldNormal, worldDir), 0.0));
+    return s;
+}
+
+
 // Helpers optimization ----------------------------------------
 
-float rRPP = 1.0/float(constants.rpp);
+float InvRPP = 1.0/float(constants.rpp);
 
 // Object intersection and shading -----------------------------
 
-bool intersectionTest(in Plane plane, out vec3 hit_p,out float t ,inout HitData hd){
+bool intersectionTest(in Plane plane, out vec3 hit_p,out vec3 hit_normal,out float t ,inout HitData hd){
 	vec3 e1 = plane.edge1.xyz;
 	vec3 e2 = plane.edge2.xyz;
 	vec3 center = plane.center.xyz;
@@ -152,10 +228,11 @@ bool intersectionTest(in Plane plane, out vec3 hit_p,out float t ,inout HitData 
 	}
 
 	hit_p = hit;
+	hit_normal = normal;
     return true;
 }
 
-bool intersectionTest(in Sphere sphere, out vec3 hit_p, out float t, inout HitData hd) {
+bool intersectionTest(in Sphere sphere, out vec3 hit_p, out vec3 hit_normal, out float t, inout HitData hd) {
     vec3 rayOrigin = hd.hit.xyz;
     vec3 rayDir = hd.wo.xyz;
     vec3 oc = rayOrigin - sphere.center_radius.xyz;
@@ -178,6 +255,7 @@ bool intersectionTest(in Sphere sphere, out vec3 hit_p, out float t, inout HitDa
         return false;
 
     hit_p = rayOrigin + t * rayDir;
+	hit_normal = normalize(hit_p - sphere.center_radius.xyz);
     return true;
 }
 
@@ -198,28 +276,33 @@ bool Trace(inout HitData hd){
 	uint nearestIndex = 0;
 	uint nearestShape = null_shape;
 	float nearestT = MAX_FLOAT;
+	vec3 nearestNormal;
 	vec3 nearestHitP;
 	const uint max_iterations = max(constants.numSpheres,constants.numPlanes);
 	for(uint i = 0; i < max_iterations;++i){
 		if(i < constants.numPlanes){
 			float hit_t;
 			vec3 hit_p;
-			bool does_hit= intersectionTest(planes[i],hit_p,hit_t,hd);
+			vec3 hit_normal;
+			bool does_hit= intersectionTest(planes[i],hit_p,hit_normal,hit_t,hd);
 			if(does_hit && hit_t < nearestT){
 				nearestT = hit_t;
 				nearestIndex = i;
 				nearestShape = plane_shape;
+				nearestNormal = hit_normal;
 				nearestHitP = hit_p;
 			}
 		}
 		if(i < constants.numSpheres){
             float hit_t;
             vec3 hit_p;
-            bool does_hit= intersectionTest(spheres[i],hit_p,hit_t,hd);
+			vec3 hit_normal;
+            bool does_hit= intersectionTest(spheres[i],hit_p,hit_normal,hit_t,hd);
             if(does_hit && hit_t < nearestT){
                 nearestT = hit_t;
                 nearestIndex = i;
                 nearestShape = sphere_shape;
+				nearestNormal = hit_normal;
                 nearestHitP = hit_p;
             }
         }
@@ -230,8 +313,10 @@ bool Trace(inout HitData hd){
 	if(nearestShape == null_shape){
 		return false;
 	}
-
-	else if(nearestShape == plane_shape){
+	
+	//Floating point correction
+	nearestHitP = nearestHitP + EPSILON*nearestNormal;
+    if(nearestShape == plane_shape){
 		fillHitData(planes[nearestIndex],nearestHitP,hd);
 	}
 
@@ -262,17 +347,18 @@ void main() {
    
 	vec4 color = vec4(void_color,1.0);
 
-	int maxDepth = 1; // TEMPORARY
 
 	// Trace scene
 
     bool hitSomething = Trace(currentHitData);
 	color.xyz += currentHitData.throughput_depth.xyz;
 
+	int maxDepth = 1; // TEMPORARY
+
 	// Update Buffers
 	//pixel_data[index].throughput_currentRay.xyz = color.xyz;
 	if(hit_data[hd_index].throughput_depth.w+1 >= maxDepth || !hitSomething){
-		pixel_data[index].throughput_currentRay.xyz += color.xyz*rRPP;
+		pixel_data[index].throughput_currentRay.xyz += color.xyz*InvRPP;
 		pixel_data[index].throughput_currentRay.w += 1;
 	}
 	else{
