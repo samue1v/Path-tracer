@@ -48,23 +48,22 @@ struct PixelData{
 struct Material{
  vec4 albedo_refractiveIdx;
  vec4 emissive_reflectiveIdx;
- uint type;
- uvec3 _pad;
+ vec4 type_pad3;
 };
 
 struct Sphere{
     vec4 center_radius;
-    vec4 color;
+	Material mat;
 };
 
 struct Plane{
   vec4 center;
   vec4 edge1;
   vec4 edge2;
-  vec4 color;
+  Material mat;
   float u;
   float v;
-  vec2 _pad;
+  uint _pad[2];
 };
 
 
@@ -261,7 +260,8 @@ bool intersectionTest(in Sphere sphere, out vec3 hit_p, out vec3 hit_normal, out
 
 void fillHitData(in Plane plane,in vec3 hit,inout HitData hd){
 
-	hd.throughput_depth.xyz += plane.color.xyz;//vec3(1.0,1.0,1.0);
+	//hd.throughput_depth.xyz += plane.color.xyz;//vec3(1.0,1.0,1.0);
+	hd.throughput_depth.xyz += plane.mat.albedo_refractiveIdx.xyz;//vec3(1.0,1.0,1.0);
 	hd.hit.xyz = hit;
 	hd.normal.xyz = normalize(cross(plane.edge1.xyz,plane.edge2.xyz));
 }
@@ -269,7 +269,8 @@ void fillHitData(in Plane plane,in vec3 hit,inout HitData hd){
 void fillHitData(in Sphere sphere, in vec3 hit_p, inout HitData hd) {
     hd.hit.xyz = hit_p;
     hd.normal.xyz = normalize(hit_p - sphere.center_radius.xyz);
-    hd.throughput_depth.xyz += sphere.color.xyz; // example
+    //hd.throughput_depth.xyz += sphere.color.xyz; // example
+    hd.throughput_depth.xyz += sphere.mat.albedo_refractiveIdx.xyz; // example
 }
 
 bool Trace(inout HitData hd){
