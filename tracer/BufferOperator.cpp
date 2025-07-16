@@ -77,6 +77,8 @@ void TauswortheOperator::doOperation(vk::Device logicalDevice,
   Logger::log(Logger::LogLevel::DEBUG, "R_DEVICE: " + std::to_string(rd()));
   std::uniform_int_distribution<uint32_t> dist(
       129, std::numeric_limits<uint32_t>::max());
+  std::uniform_int_distribution<uint32_t> dist2(
+      0, std::numeric_limits<uint32_t>::max());
 
   std::vector<Tracer::PRNG32> pPRNG(size);
 
@@ -84,8 +86,8 @@ void TauswortheOperator::doOperation(vk::Device logicalDevice,
     pPRNG[i].state.x = dist(gen);
     pPRNG[i].state.y = dist(gen);
     pPRNG[i].state.z = dist(gen);
-    pPRNG[i].state.w = dist(gen);
-    pPRNG[i].value = 0.f;
+    pPRNG[i].state.w = dist2(gen);
+    pPRNG[i].value = dist2(gen);
 
     pPRNG[i].pad[0] = 0.f;
     pPRNG[i].pad[1] = 0.f;
@@ -147,8 +149,8 @@ void MultiJitterOperator::doOperation(vk::Device logicalDevice,
 
       pHitData[i * vpps + j].hit = cam.pos;
       pHitData[i * vpps + j].wo = glm::normalize(viewport_hit - cam.pos);
-      pHitData[i * vpps + j].normal = glm::vec4(0.0f, 0.0f, 1.0f, 0.0f);
-      pHitData[i * vpps + j].throughput_depth = glm::vec4(0.0f, 0.0f, 0.0f, 0.0f);
+      pHitData[i * vpps + j].normal = glm::vec4(0.0f, 0.0f, -1.0f, 0.0f);
+      pHitData[i * vpps + j].throughput_depth = glm::vec4(1.0f, 1.0f, 1.0f, 0.0f);
     }
   }
 
@@ -224,7 +226,7 @@ void PixelFillOperator::doOperation(vk::Device logicalDevice,
 
   std::vector<Tracer::pixelData> pPixelData(size);
   for (uint32_t i = 0; i < size; ++i) {
-    pPixelData[i].throughput_currentRay = glm::vec4(1.f, 1.f, 1.f, 0.f);
+    pPixelData[i].radiance_currentRay = glm::vec4(0.f, 0.f, 0.f, 0.f);
   }
 
   uploadToVRAM(logicalDevice, cmdPool, queue, allocator, buffer,

@@ -6,7 +6,7 @@ void spawn_render_thread(GLFWwindow *window, VulkanRender *engine,
                          std::array<Tracer::camera, 2> *matrices) {
   engine->init();
   engine->app = static_cast<App *>(glfwGetWindowUserPointer(window));
-  const int target_fps = 144;
+  const int target_fps = 1;
   const long opt_time = target_fps > 0 ? 1'000'000'000 / target_fps : 0;
 
   long last_fps_time = 0;
