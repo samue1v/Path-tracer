@@ -224,7 +224,7 @@ void PixelFillOperator::doOperation(vk::Device logicalDevice,
 
   std::vector<Tracer::pixelData> pPixelData(size);
   for (uint32_t i = 0; i < size; ++i) {
-    pPixelData[i].throughput_currentRay = glm::vec4(0.f, 0.f, 0.f, 0.f);
+    pPixelData[i].throughput_currentRay = glm::vec4(1.f, 1.f, 1.f, 0.f);
   }
 
   uploadToVRAM(logicalDevice, cmdPool, queue, allocator, buffer,

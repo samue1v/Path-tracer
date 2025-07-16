@@ -5,6 +5,7 @@ layout(local_size_x = 16, local_size_y = 16) in;
 // Constant data definition ------------------------------------
 
 const float EPSILON = 1e-5;
+const float DISPLACEMENT = 1e-3; 
 
 const float MAX_FLOAT = 3.4028235e38;
 const float MIN_FLOAT = -3.4028235e38;
@@ -25,6 +26,12 @@ const float PiOver2 = 1.5707963;
 const float PiOver4 = 0.7853982;
 const float Sqrt2   = 1.4142136;
 
+const uint albedo_mat     = 0x00000000u;
+const uint reflective_mat = 0x00000001u;
+const uint refractive_mat = 0x00000010u;
+const uint emissive_mat   = 0x00000100u;
+
+
 // CPU Struct definition -------------------------------------------
 
 struct HitData {
@@ -41,7 +48,7 @@ struct PRNG32 {
 };
 
 struct PixelData{
-	vec4 throughput_currentRay;
+	vec4 color_currentRay;
 };
 
 
@@ -198,7 +205,7 @@ float InvRPP = 1.0/float(constants.rpp);
 
 // Object intersection and shading -----------------------------
 
-bool intersectionTest(in Plane plane, out vec3 hit_p,out vec3 hit_normal,out float t ,inout HitData hd){
+bool intersectionTest(in Plane plane, out vec3 hit_p,out vec3 hit_normal,out float t ,in HitData hd){
 	vec3 e1 = plane.edge1.xyz;
 	vec3 e2 = plane.edge2.xyz;
 	vec3 center = plane.center.xyz;
@@ -231,7 +238,7 @@ bool intersectionTest(in Plane plane, out vec3 hit_p,out vec3 hit_normal,out flo
     return true;
 }
 
-bool intersectionTest(in Sphere sphere, out vec3 hit_p, out vec3 hit_normal, out float t, inout HitData hd) {
+bool intersectionTest(in Sphere sphere, out vec3 hit_p, out vec3 hit_normal, out float t, in HitData hd) {
     vec3 rayOrigin = hd.hit.xyz;
     vec3 rayDir = hd.wo.xyz;
     vec3 oc = rayOrigin - sphere.center_radius.xyz;
@@ -258,22 +265,25 @@ bool intersectionTest(in Sphere sphere, out vec3 hit_p, out vec3 hit_normal, out
     return true;
 }
 
-void fillHitData(in Plane plane,in vec3 hit,inout HitData hd){
+void fillHitData(in Plane plane,in vec3 hit,inout HitData hd, inout PRNG32 rng){
 
 	//hd.throughput_depth.xyz += plane.color.xyz;//vec3(1.0,1.0,1.0);
-	hd.throughput_depth.xyz += plane.mat.albedo_refractiveIdx.xyz;//vec3(1.0,1.0,1.0);
+	hd.throughput_depth.xyz = plane.mat.albedo_refractiveIdx.xyz;//vec3(1.0,1.0,1.0);
 	hd.hit.xyz = hit;
 	hd.normal.xyz = normalize(cross(plane.edge1.xyz,plane.edge2.xyz));
+	Sample wi_pdf = sampleDiffuse(hd.normal.xyz,rng);
+	hd.wo = vec4(wi_pdf.dir,0.0);
 }
 
-void fillHitData(in Sphere sphere, in vec3 hit_p, inout HitData hd) {
+void fillHitData(in Sphere sphere, in vec3 hit_p, inout HitData hd, inout PRNG32 rng) {
     hd.hit.xyz = hit_p;
     hd.normal.xyz = normalize(hit_p - sphere.center_radius.xyz);
-    //hd.throughput_depth.xyz += sphere.color.xyz; // example
-    hd.throughput_depth.xyz += sphere.mat.albedo_refractiveIdx.xyz; // example
+	Sample wi_pdf = sampleDiffuse(hd.normal.xyz,rng);
+    hd.throughput_depth.xyz = sphere.mat.albedo_refractiveIdx.xyz; // example
+	hd.wo = vec4(wi_pdf.dir,0.0);
 }
 
-bool Trace(inout HitData hd){
+bool Trace(inout HitData hd, inout PRNG32 rng , out Material mat ){
 	uint nearestIndex = 0;
 	uint nearestShape = null_shape;
 	float nearestT = MAX_FLOAT;
@@ -286,8 +296,8 @@ bool Trace(inout HitData hd){
 			vec3 hit_p;
 			vec3 hit_normal;
 			bool does_hit= intersectionTest(planes[i],hit_p,hit_normal,hit_t,hd);
-			if(does_hit && hit_t < nearestT){
-				nearestT = hit_t;
+		if(does_hit && hit_t < nearestT){
+			nearestT = hit_t;
 				nearestIndex = i;
 				nearestShape = plane_shape;
 				nearestNormal = hit_normal;
@@ -316,13 +326,15 @@ bool Trace(inout HitData hd){
 	}
 	
 	//Floating point correction
-	nearestHitP = nearestHitP + EPSILON*nearestNormal;
+	nearestHitP = nearestHitP + DISPLACEMENT*nearestNormal;
     if(nearestShape == plane_shape){
-		fillHitData(planes[nearestIndex],nearestHitP,hd);
+		fillHitData(planes[nearestIndex],nearestHitP,hd,rng);
+		mat = planes[nearestIndex].mat;
 	}
 
 	else if(nearestShape == sphere_shape){
-		fillHitData(spheres[nearestIndex],nearestHitP,hd);
+		fillHitData(spheres[nearestIndex],nearestHitP,hd,rng);
+		mat = spheres[nearestIndex].mat;
 	}
 	return true;
 }
@@ -333,43 +345,49 @@ void main() {
     uvec2 gid = gl_GlobalInvocationID.xy;
     ivec2 imageSize = imageSize(StorageImage);
     uint index = gid.y * imageSize.x + gid.x;
-	if(pixel_data[index].throughput_currentRay.w >= constants.rpp){
+	if(pixel_data[index].color_currentRay.w >= constants.rpp){
 		return;
 	}
 
-    uint hd_index = index*constants.rpp +uint( pixel_data[index].throughput_currentRay.w);
+    uint hd_index = index*constants.rpp +uint( pixel_data[index].color_currentRay.w);
 	
 	// Acquired Data
 	HitData currentHitData =  hit_data[hd_index];
-	//currentHitData.wo = camera.invView * currentHitData.wo;
-	//currentHitData.hit = camera.invView * currentHitData.hit;
-	//TESTE
     PRNG32 rng = prng32[index];
    
-	vec4 color = vec4(void_color,1.0);
 
 
 	// Trace scene
+	vec3 radiance = vec3(0.,0.,0.);
+	Material mat;
+    bool hitSomething = Trace(currentHitData, rng, mat );
 
-    bool hitSomething = Trace(currentHitData);
-	color.xyz += currentHitData.throughput_depth.xyz;
-
-	int maxDepth = 1; // TEMPORARY
 
 	// Update Buffers
-	//pixel_data[index].throughput_currentRay.xyz = color.xyz;
-	if(hit_data[hd_index].throughput_depth.w+1 >= maxDepth || !hitSomething){
-		pixel_data[index].throughput_currentRay.xyz += color.xyz*InvRPP;
-		pixel_data[index].throughput_currentRay.w += 1;
+
+	if(!hitSomething){
+		pixel_data[index].color_currentRay.w += 1;
+		radiance += currentHitData.throughput_depth.xyz*void_color;
+	}
+	else if(uint(mat.type_pad3.x) == emissive_mat){
+		pixel_data[index].color_currentRay.w += 1;
+		radiance += currentHitData.throughput_depth.xyz*mat.emissive_reflectiveIdx.xyz;
+	}
+	else if(uint(mat.type_pad3.x) == albedo_mat){	
+		//???????????
+		hitcurrentHitData.throughput_depth.xyz;
 	}
 	else{
 		currentHitData.throughput_depth.w += 1;
-		currentHitData.throughput_depth.xyz = color.xyz;
 	}
+
+	pixel_data[index].color_currentRay.xyz += currentHitData.throughput_depth.xyz*InvRPP;
+
+	// Write Data
     prng32[index] = rng;
 	hit_data[hd_index] = currentHitData;
 	// Store image
-	vec4 newColor = vec4(pixel_data[index].throughput_currentRay.xyz,1.0);
+	radiance = pixel_data[index].color_currentRay.xyz;
     ivec2 pos = ivec2(gid);
-    imageStore(StorageImage, pos,newColor );
+    imageStore(StorageImage, pos,vec4(radiance,1.0));
 }

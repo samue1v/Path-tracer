@@ -26,7 +26,7 @@ struct alignas(16) hitData {
 };
 
 struct alignas(16) pixelData {
-  glm::vec4 throughput_currentRay;
+  glm::vec4 color_currentRay;
 };
 
 struct alignas(16) Material {
