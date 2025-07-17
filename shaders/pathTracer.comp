@@ -41,7 +41,6 @@ struct HitData {
 
 struct PRNG32 {
     uvec4 state;
-    vec4 value_pad3;
 };
 
 struct PixelData{
@@ -137,9 +136,9 @@ float random(inout PRNG32 rng)
     rng.state.z = TausStep(rng.state.z, 3, 11, 17, 4294967280u);
     rng.state.w = LCGStep(rng.state.w, 1664525u, 1013904223u);
 
-    rng.value_pad3.x = 2.3283064365387e-10f * float(rng.state.x ^ rng.state.y ^ rng.state.z ^ rng.state.w);
+    float value = 2.3283064365387e-10f * float(rng.state.x ^ rng.state.y ^ rng.state.z ^ rng.state.w);
 
-    return rng.value_pad3.x;
+    return value;
 }
 
 vec2 sampleDisk(in float u,in float v){
@@ -195,15 +194,11 @@ mat3 buildTangentBasis(in vec3 normal) {
 Sample sampleDiffuse(in vec3 worldNormal, inout PRNG32 rng) {
     float u1 = random(rng);
 	float u2 = random(rng);
-	//float u1 = 0.321;
-	//float u2 = 0.556;
 
     vec3 local = cosSampleHemisphere(u1, u2);
-	//vec3 v = normalize(cross(vec3(0.0034, 1.0, 0.0071),worldNormal));
-	//vec3 u = cross(v,worldNormal);
     mat3 TNB = buildTangentBasis(worldNormal);
     vec3 worldDir = normalize(TNB * local);
-	//vec3 worldDir = local.x*u + local.y*v + local.z*worldNormal;
+
     Sample s;
     s.dir = worldDir;
     s.pdf = cosHemispherePDF(max(dot(worldNormal, worldDir), 0.0));
@@ -284,16 +279,16 @@ vec3 fillHitData(in Plane plane,in vec3 hit,inout HitData hd, inout PRNG32 rng){
 	//hd.wo = vec4(hd.normal.xyz,0.);
 	hd.wo = vec4(wi_pdf.dir,0.0);
 
-	return plane.mat.albedo_refractiveIdx.xyz;
+	return plane.mat.albedo_refractiveIdx.xyz*InvPi;
 }
 
 vec3 fillHitData(in Sphere sphere, in vec3 hit_p, inout HitData hd, inout PRNG32 rng) {
     hd.hit.xyz = hit_p;
     hd.normal.xyz = normalize(hit_p - sphere.center_radius.xyz);
 	Sample wi_pdf = sampleDiffuse(hd.normal.xyz,rng);
-	//hd.wo = vec4(hd.normal.xyz,0.);
-	hd.wo = vec4(wi_pdf.dir,0.0);
-    return sphere.mat.albedo_refractiveIdx.xyz;
+	hd.wo = vec4(hd.normal.xyz,0.);
+	//hd.wo = vec4(wi_pdf.dir,0.0);
+    return sphere.mat.albedo_refractiveIdx.xyz*InvPi;
 }
 
 bool Trace(inout HitData hd, inout PRNG32 rng , out Material mat , out vec3 hit_throughput){
@@ -392,17 +387,26 @@ void main() {
 	}
 	else if(uint(mat.type_pad3.x) == emissive_mat){
 
-//		color = vec4(1.,1.,1.,1.);
 		currentPixelData.radiance_currentRay.xyz += currentHitData.throughput_depth.xyz*mat.emissive_reflectiveIdx.xyz*InvRPP;
 		currentPixelData.radiance_currentRay.w += 1.;
 	}
-	else if(uint(mat.type_pad3.x) == albedo_mat){	
-
-		currentHitData.throughput_depth.xyz *= hit_throughput;
-		currentHitData.throughput_depth.w += 1;
-	}
 	else{
-		//currentHitData.throughput_depth.w += 1;
+
+		float p = max(hit_throughput.r, max(hit_throughput.g, hit_throughput.b));
+		p = clamp(p, 0.1, 1.0);
+		float rr = random(rng);
+		if(uint(mat.type_pad3.x) == albedo_mat){	
+			if(rr>p){
+
+				currentPixelData.radiance_currentRay.xyz += currentHitData.throughput_depth.xyz*mat.albedo_refractiveIdx.xyz*InvRPP;
+				currentPixelData.radiance_currentRay.w += 1.;
+			}
+			else{
+	 
+				currentHitData.throughput_depth.xyz *= hit_throughput/p;
+				currentHitData.throughput_depth.w += 1;
+			}
+		}
 	}
 
 

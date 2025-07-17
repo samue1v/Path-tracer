@@ -38,8 +38,6 @@ struct HitData {
 
 struct PRNG32 {
     uvec4 state;
-    float  value;
-    uint   _pad;
 };
 
 struct PixelData {
@@ -61,10 +59,8 @@ struct Plane {
     vec4 center;
     vec4 edge1;
     vec4 edge2;
+	vec4 uv_pad2;
     Material mat;
-    float u;
-    float v;
-    uint  _pad;
 };
 
 struct Sample {
@@ -97,7 +93,6 @@ float random(inout PRNG32 rng) {
     rng.state.w = LCGStep(rng.state.w,1664525u,1013904223u);
     uint c = rng.state.x ^ rng.state.y ^ rng.state.z ^ rng.state.w;
     float r = float(c)*2.3283064e-10; // 1/2^32
-    rng.value = r;
     return r;
 }
 
@@ -150,7 +145,7 @@ bool intersectPlane(Plane pl,HitData hd,out vec3 P,out vec3 N, out float t){
     if(t<=0.0) return false;
     vec3 hit=O+t*D;
     vec3 local=hit-pl.center.xyz;
-    if(abs(dot(local,pl.edge1.xyz))>pl.u*0.5||abs(dot(local,pl.edge2.xyz))>pl.v*0.5) return false;
+    if(abs(dot(local,pl.edge1.xyz))>pl.uv_pad2.x*0.5||abs(dot(local,pl.edge2.xyz))>pl.uv_pad2.y*0.5) return false;
     P=hit; N=norm; return true;
 }
 bool intersectSphere(Sphere sp,HitData hd,out vec3 P,out vec3 N, out float t){

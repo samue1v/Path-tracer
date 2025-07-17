@@ -77,7 +77,6 @@ void TauswortheOperator::doOperation(vk::Device logicalDevice,
   Logger::log(Logger::LogLevel::DEBUG, "R_DEVICE: " + std::to_string(rd()));
   std::uniform_int_distribution<uint32_t> dist(
       129, std::numeric_limits<uint32_t>::max());
-  std::uniform_real_distribution<float> dist2(0.f,1.f);
 
   std::vector<Tracer::PRNG32> pPRNG(size);
 
@@ -86,7 +85,6 @@ void TauswortheOperator::doOperation(vk::Device logicalDevice,
     pPRNG[i].state.y = dist(gen);
     pPRNG[i].state.z = dist(gen);
     pPRNG[i].state.w = dist(gen);
-    pPRNG[i].value_pad3 = {dist2(gen),0.,0.,0.};
   }
 
   uploadToVRAM(logicalDevice, cmdPool, queue, allocator, buffer,

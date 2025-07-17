@@ -276,7 +276,7 @@ void VulkanRender::initializeScene() {
       glm::vec4(1.f, 0.f, 0.f, 0.f),    // edge1 = X
       glm::vec4(0.f, 0.f, -1.f, 0.f),   // edge2 = Z
       glm::vec4(640.f + overlap, 1280.f + overlap, 0.f, 0.f),
-      {{0.f, 0.6f, 0.6f, 1.0f},
+      {{0.6f, 0.6f, 0.6f, 1.0f},
        {0.6f, 0.6f, 0.6f, 1.0},
        {0., 0., 0., 0.}}, // Gray
 
@@ -319,14 +319,14 @@ void VulkanRender::initializeScene() {
        glm::vec4(1.f, 0.f, 0.f, 0.f),
        glm::vec4(0.f, -1.f, 0.f, 0.f),
        glm::vec4(640.f + overlap, 640.f + overlap, 0.f, 0.f),
-       {{0.6f, 0.f, 0.f, 1.0f}, {0., 0., 0., 0.}, {0.0, .0, .0, .0}}});
+       {{0.6f, 0.6f, 0.6f, 1.0f}, {0., 0., 0., 0.}, {0.0, .0, .0, .0}}});
 
-  // compute.spheres.push_back({
-  //     glm::vec4(-240.f, -100.f, -560.f, 80.f), // position (x, y, z) + radius
-  //     {{0.4f, 0.0f, 0.0f, 1.f},
-  //      {0., 0., 0., 0.},
-  //      {0.0, .0, .0, .0}} // white color in BGR
-  // });
+   compute.spheres.push_back({
+       glm::vec4(-240.f, -100.f, -560.f, 80.f), // position (x, y, z) + radius
+       {{0.4f, 0.0f, 0.0f, 1.f},
+        {0., 0., 0., 0.},
+        {0.0, .0, .0, .0}} // white color in BGR
+   });
 
   // compute.planes.push_back(
   //     {glm::vec4(0.f, -100.f, -550.f, 1.f),
@@ -335,12 +335,12 @@ void VulkanRender::initializeScene() {
   //      glm::vec4(80.f,80.f,0.f,0.f),
   //      {{0.6f, 0.f, 0.f, 1.0f}, {0., 0., 0., 0.}, {0.0, .0, .0, .0}}});
 
-  // compute.spheres.push_back({
-  //     glm::vec4(0.f, 0.f, -600.f, 80.f), // center + radius
-  //     {{0.0f, 0.8f, 0.8f, 1.0f},
-  //      {0., 0., 0., 0.},
-  //      {0.0, .0, .0, .0}} // Cyan-ish color (BGR)
-  // });
+ compute.spheres.push_back({
+     glm::vec4(0.f, 0.f, -600.f, 80.f), // center + radius
+     {{0.0f, 0.8f, 0.8f, 1.0f},
+      {0., 0., 0., 0.},
+      {0.0, .0, .0, .0}} // Cyan-ish color (BGR)
+ });
 
   // Plane light (luz do teto)
   compute.planes.push_back({glm::vec4(0.f, 319.f, 0.f, 1.f),

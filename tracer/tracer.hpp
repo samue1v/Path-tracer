@@ -8,7 +8,6 @@ namespace Tracer {
 
 struct alignas(16) PRNG32 {
   glm::uvec4 state;
-  glm::vec4 value_pad3;
 };
 
 struct alignas(16) camera {
