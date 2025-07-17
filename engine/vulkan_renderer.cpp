@@ -266,14 +266,19 @@ void VulkanRender::initializeScene() {
   compute.cameraUniform.invView = glm::inverse(compute.cameraUniform.view);
 
   const float overlap = 0.001f;
+  float angle = glm::radians(5.0f); // small tilt, 5 degrees
+
+  // Define a rotation matrix around X (edge1 axis)
+  glm::mat4 rot = glm::rotate(glm::mat4(1.0f), angle, glm::vec3(1.f, 0.f, 0.f));
   // Floor (chão)
   compute.planes.push_back({
       glm::vec4(0.f, -320.f, 0.f, 1.f), // Center
       glm::vec4(1.f, 0.f, 0.f, 0.f),    // edge1 = X
-      glm::vec4(0.f, 0.f, -1.f, 0.f),    // edge2 = Z
-      {{0.6f, 0.6f, 0.6f, 1.0f}, {0., 0., 0., 0.}, {1.0, .0, .0, .0}}, // Gray
-      640.f+overlap, // Full width in X
-      1280.f+overlap // Full depth in Z (from -640 to +640)
+      glm::vec4(0.f, 0.f, -1.f, 0.f),   // edge2 = Z
+      glm::vec4(640.f + overlap, 1280.f + overlap, 0.f, 0.f),
+      {{0.f, 0.6f, 0.6f, 1.0f},
+       {0.6f, 0.6f, 0.6f, 1.0},
+       {0., 0., 0., 0.}}, // Gray
 
   });
   // Ceiling (teto)
@@ -281,76 +286,79 @@ void VulkanRender::initializeScene() {
       {glm::vec4(0.f, 320.f, 0.f, 1.f),
        glm::vec4(1.f, 0.f, 0.f, 0.f),
        glm::vec4(0.f, 0.f, 1.f, 0.f),
-       {{0.6f, 0.6f, 0.6f, 1.0f}, {0., 0., 0., 0.}, {0.0, .0, .0, .0}},
-       640.f+overlap,
-       1280.f+overlap});
+       glm::vec4(640.f + overlap, 1280.f + overlap, 0.f, 0.f),
+       {{0.6f, 0.6f, 0.6f, 1.0f}, {0., 0., 0., 0.}, {0.0, 0., 0., 0.}}});
 
   // Back wall (fundo da caixa)
   compute.planes.push_back(
       {glm::vec4(0.f, 0.f, -640.f, 1.f),
        glm::vec4(1.f, 0.f, 0.f, 0.f),
        glm::vec4(0.f, 1.f, 0.f, 0.f),
-       {{0.6f, 0.6f, 0.6f, 1.0f}, {0., 0., 0., 0.}, {0.0, .0, .0, .0}},
-       640.f+overlap,
-       640.f+overlap});
+       glm::vec4(640.f + overlap, 640.f + overlap, 0.f, 0.f),
+       {{0.6f, 0.6f, 0.6f, 1.0f}, {0., 0., 0., 0.}, {0.0, 0., 0., 0.}}});
 
   // Left wall (parede esquerda)
   compute.planes.push_back(
       {glm::vec4(-320.f, 0.f, 0.f, 1.f),
        glm::vec4(0.f, 0.f, 1.f, 0.f),
        glm::vec4(0.f, -1.f, 0.f, 0.f),
-       {{0.0f, 0.0f, 0.8f, 1.0f}, {0., 0., 0., 0.}, {0.0, .0, .0, .0}},
-       1280.f+overlap,
-       640.f+overlap});
+       glm::vec4(1280.f + overlap, 640.f + overlap, 0.f, 0.f),
+       {{0.0f, 0.0f, 0.8f, 1.0f}, {0., 0., 0., 0.}, {0.0, .0, .0, .0}}});
 
   // Right wall (parede direita)
   compute.planes.push_back(
       {glm::vec4(320.f, 0.f, 0.f, 1.f),
        glm::vec4(0.f, 0.f, 1.f, 0.f),
        glm::vec4(0.f, 1.f, 0.f, 0.f),
-       {{0.0f, 0.8f, 0.0f, 1.0f}, {0., 0., 0., 0.}, {0.0, .0, .0, .0}},
-       1280.f+overlap,
-       640.f+overlap});
+       glm::vec4(1280.f + overlap, 640.f + overlap, 0.f, 0.f),
+       {{0.0f, 0.8f, 0.0f, 1.0f}, {0., 0., 0., 0.}, {0.0, .0, .0, .0}}});
 
   // Front wall (parede atrás da câmera)
   compute.planes.push_back(
       {glm::vec4(0.f, 0.f, 640.f, 1.f),
        glm::vec4(1.f, 0.f, 0.f, 0.f),
        glm::vec4(0.f, -1.f, 0.f, 0.f),
-       {{0.6f, 0.f, 0.f, 1.0f}, {0., 0., 0., 0.}, {0.0, .0, .0, .0}},
-       640.f+overlap,
-       640.f+overlap});
+       glm::vec4(640.f + overlap, 640.f + overlap, 0.f, 0.f),
+       {{0.6f, 0.f, 0.f, 1.0f}, {0., 0., 0., 0.}, {0.0, .0, .0, .0}}});
 
-  //compute.spheres.push_back({
-  //    glm::vec4(-240.f, -100.f, -560.f, 80.f), // position (x, y, z) + radius
-  //    {{0.4f, 0.0f, 0.0f, 1.f},
-  //     {0., 0., 0., 0.},
-  //     {0.0, .0, .0, .0}} // white color in BGR
-  //});
+  // compute.spheres.push_back({
+  //     glm::vec4(-240.f, -100.f, -560.f, 80.f), // position (x, y, z) + radius
+  //     {{0.4f, 0.0f, 0.0f, 1.f},
+  //      {0., 0., 0., 0.},
+  //      {0.0, .0, .0, .0}} // white color in BGR
+  // });
 
-  compute.planes.push_back(
-      {glm::vec4(0.f, -100.f, -550.f, 1.f),
-       glm::vec4(1.f, 0.f, 0.f, 0.f),
-       glm::vec4(0.f, 0.f, -1.f, 0.f),
-       {{0.6f, 0.f, 0.f, 1.0f}, {0., 0., 0., 0.}, {0.0, .0, .0, .0}},
-       80.f,
-       80.f});
+  // compute.planes.push_back(
+  //     {glm::vec4(0.f, -100.f, -550.f, 1.f),
+  //      glm::vec4(1.f, 0.f, 0.f, 0.f),
+  //      glm::vec4(0.f, 0.f, -1.f, 0.f),
+  //      glm::vec4(80.f,80.f,0.f,0.f),
+  //      {{0.6f, 0.f, 0.f, 1.0f}, {0., 0., 0., 0.}, {0.0, .0, .0, .0}}});
 
-  compute.spheres.push_back({
-      glm::vec4(0.f, 0.f, -600.f, 80.f), // center + radius
-      {{0.0f, 0.8f, 0.8f, 1.0f},
-       {0., 0., 0., 0.},
-       {0.0, .0, .0, .0}} // Cyan-ish color (BGR)
-  });
+  // compute.spheres.push_back({
+  //     glm::vec4(0.f, 0.f, -600.f, 80.f), // center + radius
+  //     {{0.0f, 0.8f, 0.8f, 1.0f},
+  //      {0., 0., 0., 0.},
+  //      {0.0, .0, .0, .0}} // Cyan-ish color (BGR)
+  // });
 
   // Plane light (luz do teto)
-  compute.planes.push_back(
-      {glm::vec4(0.f, 318.f, 0.f, 1.f),
-       glm::vec4(1.f, 0.f, 0.f, 0.f),
-       glm::vec4(0.f, 0.f, 1.f, 0.f),
-       {{1.f, 1.f, 1.f, 1.0f}, {100.f, 100.f, 100.f, 0.0f}, {4.0, .0, .0, .0}},
-       200.f,
-       400.f});
+  compute.planes.push_back({glm::vec4(0.f, 319.f, 0.f, 1.f),
+                            glm::vec4(1.f, 0.f, 0.f, 0.f),
+                            glm::vec4(0.f, 0.f, 1.f, 0.f),
+                            glm::vec4(200.f, 400.f, 0.f, 0.f),
+                            {{1.f, 1.f, 1.f, 1.0f},
+                             {100.f, 100.f, 100.f, 0.0f},
+                             {4.0, .0, .0, .0}}});
+
+  // compute.planes.push_back(
+  //     {glm::vec4(0.f, 0.f, -639.f, 1.f),
+  //      glm::vec4(1.f, 0.f, 0.f, 0.f),
+  //      glm::vec4(0.f, 1.f, 0.f, 0.f),
+  //      glm::vec4(200.f,400.f,0.f,0.f),
+  //      {{1.f, 1.f, 1.f, 1.0f}, {100.f, 100.f, 100.f, 0.0f}, {4.0, .0, .0,
+  //      .0}}});
+  //}
 }
 
 void VulkanRender::initializeBuffers() {
@@ -456,7 +464,7 @@ void VulkanRender::drawFrame() {
       std::ostringstream oss;
       oss << std::put_time(&local_tm, "%Y-%m-%d %H:%M:%S");
 
-      Logger::log(Logger::LogLevel::DEBUG, "Compute done at: " + oss.str());
+      //Logger::log(Logger::LogLevel::DEBUG, "Compute done at: " + oss.str());
     }
     // logicalDevice.waitForFences(1,&compute.computeFence,1, UINT64_MAX);
   }

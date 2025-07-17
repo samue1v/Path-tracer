@@ -86,11 +86,7 @@ void TauswortheOperator::doOperation(vk::Device logicalDevice,
     pPRNG[i].state.y = dist(gen);
     pPRNG[i].state.z = dist(gen);
     pPRNG[i].state.w = dist(gen);
-    pPRNG[i].value = dist2(gen);
-
-    pPRNG[i].pad[0] = 0u;
-    pPRNG[i].pad[1] = 0u;
-    pPRNG[i].pad[2] = 0u;
+    pPRNG[i].value_pad3 = {dist2(gen),0.,0.,0.};
   }
 
   uploadToVRAM(logicalDevice, cmdPool, queue, allocator, buffer,
@@ -184,6 +180,8 @@ void SphereFillOperator::doOperation(vk::Device logicalDevice,
                                      Buffer &buffer, size_t size,
                                      VmaAllocator allocator) {
 
+
+
   std::vector<Tracer::sphere> pSpheres(size);
   for (uint32_t i = 0; i < _spheres.size(); i++) {
     pSpheres[i].center_radius = _spheres[i].center_radius;
@@ -209,9 +207,7 @@ void PlaneFillOperator::doOperation(vk::Device logicalDevice,
     pPlanes[i].edge1 = _planes[i].edge1;
     pPlanes[i].edge2 = _planes[i].edge2;
     pPlanes[i].mat = _planes[i].mat;
-    pPlanes[i].u = _planes[i].u;
-    pPlanes[i].v = _planes[i].v;
-    pPlanes[i].pad[0] = 0;
+    pPlanes[i].uv_pad2 = _planes[i].uv_pad2;
   }
 
   uploadToVRAM(logicalDevice, cmdPool, queue, allocator, buffer,

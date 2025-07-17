@@ -41,8 +41,7 @@ struct HitData {
 
 struct PRNG32 {
     uvec4 state;
-    float value;
-	uvec3 _pad;
+    vec4 value_pad3;
 };
 
 struct PixelData{
@@ -65,10 +64,8 @@ struct Plane{
   vec4 center;
   vec4 edge1;
   vec4 edge2;
+  vec4 uv_pad2;
   Material mat;
-  float u;
-  float v;
-  uint _pad[2];
 };
 
 
@@ -92,7 +89,7 @@ layout(std430, set = 0, binding = 1) buffer HitDataBuffer {
     HitData hit_data[];
 };
 
-layout(rgba8, binding = 2) uniform image2D StorageImage;
+layout(rgba8, binding = 2) uniform writeonly image2D StorageImage;
 
 layout(std430, set = 0, binding = 3) buffer RNGBuffer{
     PRNG32 prng32[];
@@ -140,9 +137,9 @@ float random(inout PRNG32 rng)
     rng.state.z = TausStep(rng.state.z, 3, 11, 17, 4294967280u);
     rng.state.w = LCGStep(rng.state.w, 1664525u, 1013904223u);
 
-    rng.value = 2.3283064365387e-10f * float(rng.state.x ^ rng.state.y ^ rng.state.z ^ rng.state.w);
+    rng.value_pad3.x = 2.3283064365387e-10f * float(rng.state.x ^ rng.state.y ^ rng.state.z ^ rng.state.w);
 
-    return rng.value;
+    return rng.value_pad3.x;
 }
 
 vec2 sampleDisk(in float u,in float v){
@@ -181,51 +178,37 @@ mat3 buildTangentBasis(in vec3 normal) {
     vec3 bitangent = cross(normal, tangent);
     return mat3(tangent, normal, bitangent); // Tangent-space to world-space
 }
+//mat3 buildTangentBasis(in vec3 n) {
+//    vec3 up = abs(n.y) < 0.999 ? vec3(0., 1., 0.) : vec3(0., 0., 1.);
+//    vec3 tangent = normalize(cross(up, n));
+//    vec3 bitangent = cross(n, tangent);
+//    return mat3(tangent, n, bitangent); // Tangent space to world space
+//}
+
+//mat3 buildTangentBasis(in vec3 n) {
+//    vec3 up = abs(n.y) < 0.999 ? vec3(0., 1., 0.) : vec3(1., 0., 0.);
+//    vec3 tangent = normalize(cross(up, n));
+//    vec3 bitangent = cross(n, tangent);
+//    return mat3(tangent, bitangent, n); // Local to world
+//}
 
 Sample sampleDiffuse(in vec3 worldNormal, inout PRNG32 rng) {
     float u1 = random(rng);
-    float u2 = random(rng);
+	float u2 = random(rng);
+	//float u1 = 0.321;
+	//float u2 = 0.556;
 
     vec3 local = cosSampleHemisphere(u1, u2);
+	//vec3 v = normalize(cross(vec3(0.0034, 1.0, 0.0071),worldNormal));
+	//vec3 u = cross(v,worldNormal);
     mat3 TNB = buildTangentBasis(worldNormal);
     vec3 worldDir = normalize(TNB * local);
-
+	//vec3 worldDir = local.x*u + local.y*v + local.z*worldNormal;
     Sample s;
     s.dir = worldDir;
     s.pdf = cosHemispherePDF(max(dot(worldNormal, worldDir), 0.0));
     return s;
 }
-
-//mat3 buildTangentBasis(in vec3 N) {
-//    vec3 up = abs(N.y) < 0.999 
-//              ? vec3(0.0,1.0,0.0) 
-//              : vec3(1.0,0.0,0.0);
-//
-//    vec3 T = normalize(cross(up, N));   // tangent
-//    vec3 B = cross(N, T);               // bitangent
-//
-//    // columns are (T, N, B), so local.y → N
-//    return mat3(T, N, B);
-//}
-//
-//Sample sampleDiffuse(in vec3 worldNormal, inout PRNG32 rng) {
-//    float u1 = random(rng);
-//    float u2 = random(rng);
-//
-//    // local-space sample with Y up
-//    vec3 local = cosSampleHemisphere(u1, u2);
-//
-//    // build TNB and rotate into world
-//    mat3 TNB = buildTangentBasis(worldNormal);
-//    vec3 worldDir = normalize(TNB * local);
-//
-//    Sample s;
-//    s.dir = worldDir;
-//    s.pdf = max(dot(worldNormal, worldDir), 0.0) * InvPi; // cosθ/π
-//    return s;
-//}
-
-
 
 // Helpers optimization ----------------------------------------
 
@@ -248,7 +231,7 @@ bool intersectionTest(in Plane plane, out vec3 hit_p,out vec3 hit_normal,out flo
 
     t = dot(center - rayOrigin, normal) / denom;
 
-    if (t < 0.0)
+    if (t < EPSILON)
         return false; // Intersection is behind the ray
 
     vec3 hit = rayOrigin + t * rayDir;
@@ -257,7 +240,7 @@ bool intersectionTest(in Plane plane, out vec3 hit_p,out vec3 hit_normal,out flo
     float u = dot(local,e1); 
     float v = dot(local,e2);
 
-    if (abs(u) > (plane.u * 0.5) || abs(v) > (plane.v * 0.5)){
+    if (abs(u) > (plane.uv_pad2.x * 0.5) || abs(v) > (plane.uv_pad2.y * 0.5)){
         return false;
 	}
 
@@ -295,14 +278,13 @@ bool intersectionTest(in Sphere sphere, out vec3 hit_p, out vec3 hit_normal, out
 
 vec3 fillHitData(in Plane plane,in vec3 hit,inout HitData hd, inout PRNG32 rng){
 
-	//hd.throughput_depth.xyz += plane.color.xyz;//vec3(1.0,1.0,1.0);
 	hd.hit.xyz = hit;
 	hd.normal.xyz = normalize(cross(plane.edge1.xyz,plane.edge2.xyz));
 	Sample wi_pdf = sampleDiffuse(hd.normal.xyz,rng);
 	//hd.wo = vec4(hd.normal.xyz,0.);
 	hd.wo = vec4(wi_pdf.dir,0.0);
-	//return plane.mat.type_pad3.x == emissive_mat ? plane.mat.emissive_reflectiveIdx.xyz : plane.mat.albedo_refractiveIdx.xyz;
-	return (plane.mat.albedo_refractiveIdx.xyz * InvPi) * dot(hd.normal.xyz,wi_pdf.dir) / wi_pdf.pdf;
+
+	return plane.mat.albedo_refractiveIdx.xyz;
 }
 
 vec3 fillHitData(in Sphere sphere, in vec3 hit_p, inout HitData hd, inout PRNG32 rng) {
@@ -391,7 +373,10 @@ void main() {
 
 	// Trace scene
 	Material mat;
-	vec3 hit_throughput;
+	mat.albedo_refractiveIdx = vec4(1.,1.,1.,0.);
+	mat.emissive_reflectiveIdx = vec4(0.,0.,0.,0.);
+	mat.type_pad3 = vec4(0.,0.,0.,0.);
+	vec3 hit_throughput = vec3(1.,1.,1.);
     bool hitSomething = Trace(currentHitData, rng, mat , hit_throughput);
 
 
@@ -399,7 +384,7 @@ void main() {
 
 
 	// TESTE
-	vec4 color = vec4(1.,1.,1.,1.);
+	vec4 color = vec4(0.,0.,0.,0.);
 	if(!hitSomething){
 
 		currentPixelData.radiance_currentRay.xyz += currentHitData.throughput_depth.xyz*void_color*InvRPP;
@@ -428,6 +413,7 @@ void main() {
 
 	// Store image
     ivec2 pos = ivec2(gid);
-	color = vec4(currentPixelData.radiance_currentRay.xyz,1.0);
+	color = vec4(currentPixelData.radiance_currentRay.xyz,0.0);
     imageStore(StorageImage, pos,color);
+
 }

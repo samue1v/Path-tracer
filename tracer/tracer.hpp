@@ -8,8 +8,7 @@ namespace Tracer {
 
 struct alignas(16) PRNG32 {
   glm::uvec4 state;
-  float value;
-  uint32_t pad[3];
+  glm::vec4 value_pad3;
 };
 
 struct alignas(16) camera {
@@ -47,11 +46,8 @@ struct alignas(16) plane {
   glm::vec4 center;
   glm::vec4 edge1;
   glm::vec4 edge2;
-
+  glm::vec4 uv_pad2;
   Tracer::Material mat;
-  float u;
-  float v;
-  uint32_t pad[2];
 };
 
 struct alignas(16) PushConstants {
