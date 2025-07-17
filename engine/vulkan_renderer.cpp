@@ -262,7 +262,7 @@ void VulkanRender::initializeScene() {
   compute.cameraUniform.pos = glm::vec4(0.0f, 0.0f, vp_dist, 1.0f);
   compute.cameraUniform.view =
       glm::lookAt(glm::vec3(0.f, 0.f, vp_dist), glm::vec3(0.f, 0.f, -1.f),
-                  glm::vec3(0.f, 1.f, 0.f));
+                  glm::vec3(0.f, 0.f, 0.f));
   compute.cameraUniform.invView = glm::inverse(compute.cameraUniform.view);
 
   const float overlap = 0.001f;
@@ -271,7 +271,7 @@ void VulkanRender::initializeScene() {
       glm::vec4(0.f, -320.f, 0.f, 1.f), // Center
       glm::vec4(1.f, 0.f, 0.f, 0.f),    // edge1 = X
       glm::vec4(0.f, 0.f, -1.f, 0.f),    // edge2 = Z
-      {{0.6f, 0.6f, 0.6f, 1.0f}, {0., 0., 0., 0.}, {0.0, .0, .0, .0}}, // Gray
+      {{0.6f, 0.6f, 0.6f, 1.0f}, {0., 0., 0., 0.}, {1.0, .0, .0, .0}}, // Gray
       640.f+overlap, // Full width in X
       1280.f+overlap // Full depth in Z (from -640 to +640)
 
@@ -322,18 +322,26 @@ void VulkanRender::initializeScene() {
        640.f+overlap});
 
   //compute.spheres.push_back({
-  //    glm::vec4(-240.f, -240.f, -560.f, 80.f), // position (x, y, z) + radius
-  //    {{1.f, 1.f, 1.f, 1.f},
+  //    glm::vec4(-240.f, -100.f, -560.f, 80.f), // position (x, y, z) + radius
+  //    {{0.4f, 0.0f, 0.0f, 1.f},
   //     {0., 0., 0., 0.},
   //     {0.0, .0, .0, .0}} // white color in BGR
   //});
 
-  //compute.spheres.push_back({
-  //    glm::vec4(0.f, 0.f, -600.f, 80.f), // center + radius
-  //    {{0.0f, 0.8f, 0.8f, 1.0f},
-  //     {0., 0., 0., 0.},
-  //     {0.0, .0, .0, .0}} // Cyan-ish color (BGR)
-  //});
+  compute.planes.push_back(
+      {glm::vec4(0.f, -100.f, -550.f, 1.f),
+       glm::vec4(1.f, 0.f, 0.f, 0.f),
+       glm::vec4(0.f, 0.f, -1.f, 0.f),
+       {{0.6f, 0.f, 0.f, 1.0f}, {0., 0., 0., 0.}, {0.0, .0, .0, .0}},
+       80.f,
+       80.f});
+
+  compute.spheres.push_back({
+      glm::vec4(0.f, 0.f, -600.f, 80.f), // center + radius
+      {{0.0f, 0.8f, 0.8f, 1.0f},
+       {0., 0., 0., 0.},
+       {0.0, .0, .0, .0}} // Cyan-ish color (BGR)
+  });
 
   // Plane light (luz do teto)
   compute.planes.push_back(

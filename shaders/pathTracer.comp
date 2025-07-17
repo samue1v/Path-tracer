@@ -1,4 +1,4 @@
-#version 460
+#version 450
 
 layout(local_size_x = 16, local_size_y = 16) in;
 
@@ -135,12 +135,12 @@ uint LCGStep(uint z, uint A, uint C)
 
 float random(inout PRNG32 rng)
 {
-    rng.state.x = TausStep(rng.state.x, 13, 19, 12, 4294967294);
-    rng.state.y = TausStep(rng.state.y, 2, 25, 4, 4294967288);
-    rng.state.z = TausStep(rng.state.z, 3, 11, 17, 4294967280);
-    rng.state.w = LCGStep(rng.state.w, 1664525, 1013904223);
+    rng.state.x = TausStep(rng.state.x, 13, 19, 12, 4294967294u);
+    rng.state.y = TausStep(rng.state.y, 2, 25, 4, 4294967288u);
+    rng.state.z = TausStep(rng.state.z, 3, 11, 17, 4294967280u);
+    rng.state.w = LCGStep(rng.state.w, 1664525u, 1013904223u);
 
-    rng.value = 2.3283064365387e-10 * (rng.state.x ^ rng.state.y ^ rng.state.z ^ rng.state.w);
+    rng.value = 2.3283064365387e-10f * float(rng.state.x ^ rng.state.y ^ rng.state.z ^ rng.state.w);
 
     return rng.value;
 }
@@ -162,7 +162,7 @@ vec2 sampleDisk(in float u,in float v){
     	r = vOffset;
         theta = PiOver2 - PiOver4 * (uOffset / vOffset);
     }
-	return r * vec2(cos(theta), (theta));
+	return r * vec2(cos(theta), sin(theta));
 }
 
 float cosHemispherePDF(in float cosTheta){
@@ -195,6 +195,36 @@ Sample sampleDiffuse(in vec3 worldNormal, inout PRNG32 rng) {
     s.pdf = cosHemispherePDF(max(dot(worldNormal, worldDir), 0.0));
     return s;
 }
+
+//mat3 buildTangentBasis(in vec3 N) {
+//    vec3 up = abs(N.y) < 0.999 
+//              ? vec3(0.0,1.0,0.0) 
+//              : vec3(1.0,0.0,0.0);
+//
+//    vec3 T = normalize(cross(up, N));   // tangent
+//    vec3 B = cross(N, T);               // bitangent
+//
+//    // columns are (T, N, B), so local.y → N
+//    return mat3(T, N, B);
+//}
+//
+//Sample sampleDiffuse(in vec3 worldNormal, inout PRNG32 rng) {
+//    float u1 = random(rng);
+//    float u2 = random(rng);
+//
+//    // local-space sample with Y up
+//    vec3 local = cosSampleHemisphere(u1, u2);
+//
+//    // build TNB and rotate into world
+//    mat3 TNB = buildTangentBasis(worldNormal);
+//    vec3 worldDir = normalize(TNB * local);
+//
+//    Sample s;
+//    s.dir = worldDir;
+//    s.pdf = max(dot(worldNormal, worldDir), 0.0) * InvPi; // cosθ/π
+//    return s;
+//}
+
 
 
 // Helpers optimization ----------------------------------------
@@ -358,6 +388,7 @@ void main() {
     PRNG32 rng = prng32[index];
 
 
+
 	// Trace scene
 	Material mat;
 	vec3 hit_throughput;
@@ -368,7 +399,7 @@ void main() {
 
 
 	// TESTE
-	vec4 color = vec4(0.,0.,0.,1.);
+	vec4 color = vec4(1.,1.,1.,1.);
 	if(!hitSomething){
 
 		currentPixelData.radiance_currentRay.xyz += currentHitData.throughput_depth.xyz*void_color*InvRPP;

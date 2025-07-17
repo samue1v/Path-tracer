@@ -1,0 +1,246 @@
+#version 460
+
+layout(local_size_x = 16, local_size_y = 16) in;
+
+// ---------------------------------------------------------
+// Constant data (push constants)
+// ---------------------------------------------------------
+layout(push_constant) uniform PushConstants {
+    uint rpp;
+    uint numSpheres;
+    uint numPlanes;
+} constants;
+
+// ---------------------------------------------------------
+// Global constants
+// ---------------------------------------------------------
+const float EPSILON       = 1e-7;
+const float DISPLACEMENT  = 1e-3;
+const float MAX_FLOAT     = 3.4028235e38;
+const uint  null_shape    = 0x0u;
+const uint  plane_shape   = 0x1u;
+const uint  sphere_shape  = 0x2u;
+const uint  albedo_mat    = 0x0u;
+const uint  emissive_mat  = 0x4u;
+const float Pi            = 3.1415927;
+const float InvPi         = 0.3183099;
+const vec3 void_color = vec3(0.1f, 0.15f, 0.2f);
+
+// ---------------------------------------------------------
+// Struct definitions (matching CPU)
+// ---------------------------------------------------------
+struct HitData {
+    vec4 wo;
+    vec4 hit;
+    vec4 normal;
+    vec4 throughput_depth; // xyz = throughput, w = depth
+};
+
+struct PRNG32 {
+    uvec4 state;
+    float  value;
+    uint   _pad;
+};
+
+struct PixelData {
+    vec4 radiance_currentRay;
+};
+
+struct Material {
+    vec4 albedo_refractiveIdx;
+    vec4 emissive_reflectiveIdx;
+    vec4 type_pad3;
+};
+
+struct Sphere {
+    vec4 center_radius;
+    Material mat;
+};
+
+struct Plane {
+    vec4 center;
+    vec4 edge1;
+    vec4 edge2;
+    Material mat;
+    float u;
+    float v;
+    uint  _pad;
+};
+
+struct Sample {
+    vec3 dir;
+    float pdf;
+};
+
+// ---------------------------------------------------------
+// Bindings
+// ---------------------------------------------------------
+layout(set=0,binding=1) buffer HitDataBuffer { HitData   hit_data[];   };
+layout(set=0,binding=2,rgba32f) writeonly uniform image2D StorageImage;
+layout(set=0,binding=3) buffer RNGBuffer     { PRNG32    prng32[];     };
+layout(set=0,binding=4) buffer SpheresBuffer { Sphere    spheres[];     };
+layout(set=0,binding=5) buffer PlanesBuffer  { Plane     planes[];      };
+layout(set=0,binding=6) buffer PixelDataBuf  { PixelData pixel_data[]; };
+
+// ---------------------------------------------------------
+// RNG: combined Taus+LCG
+// ---------------------------------------------------------
+uint TausStep(uint z,int S1,int S2,int S3,uint M){
+    uint b = (((z<<S1)^z)>>S2);
+    return (((z&M)<<S3)^b);
+}
+uint LCGStep(uint z,uint A,uint C){ return A*z + C; }
+float random(inout PRNG32 rng) {
+    rng.state.x = TausStep(rng.state.x,13,19,12,4294967294u);
+    rng.state.y = TausStep(rng.state.y,2,25,4,    4294967288u);
+    rng.state.z = TausStep(rng.state.z,3,11,17,   4294967280u);
+    rng.state.w = LCGStep(rng.state.w,1664525u,1013904223u);
+    uint c = rng.state.x ^ rng.state.y ^ rng.state.z ^ rng.state.w;
+    float r = float(c)*2.3283064e-10; // 1/2^32
+    rng.value = r;
+    return r;
+}
+
+// ---------------------------------------------------------
+// Disk & cosine‐hemisphere sampling (Y-up)
+// ---------------------------------------------------------
+vec2 sampleDisk(float u,float v){
+    float a=2.0*u-1.0, b=2.0*v-1.0;
+    if(abs(a)<EPSILON&&abs(b)<EPSILON) return vec2(0.0);
+    float r,phi;
+    if(abs(a)>abs(b)) { r=a; phi=Pi/4.0*(b/a); }
+    else               { r=b; phi=Pi/2.0-Pi/4.0*(a/b); }
+    return r*vec2(cos(phi),sin(phi));
+}
+vec3 cosSampleHemisphere(float u,float v){
+    vec2 d=sampleDisk(u,v);
+    float y=sqrt(max(0.0,1.0-d.x*d.x-d.y*d.y));
+    return vec3(d.x,y,d.y);
+}
+
+// ---------------------------------------------------------
+// TBN build (Y-up axis)
+// ---------------------------------------------------------
+mat3 buildTangentBasis(vec3 N){
+    vec3 up = abs(N.y)<0.999?vec3(0,1,0):vec3(1,0,0);
+    vec3 T=normalize(cross(up,N));
+    vec3 B=cross(N,T);
+    return mat3(T,N,B);
+}
+
+// ---------------------------------------------------------
+// Diffuse sampling
+// ---------------------------------------------------------
+Sample sampleDiffuse(vec3 N,inout PRNG32 rng){
+    float u1=random(rng),u2=random(rng);
+    vec3 local=cosSampleHemisphere(u1,u2);
+    vec3 dir=normalize(buildTangentBasis(N)*local);
+    Sample s; s.dir=dir; s.pdf=max(dot(N,dir),0.0)*InvPi; return s;
+}
+
+// ---------------------------------------------------------
+// Intersection tests
+// ---------------------------------------------------------
+bool intersectPlane(Plane pl,HitData hd,out vec3 P,out vec3 N, out float t){
+    vec3 O=hd.hit.xyz, D=hd.wo.xyz;
+    vec3 norm=normalize(cross(pl.edge1.xyz,pl.edge2.xyz));
+    float denom=dot(norm,D);
+    if(abs(denom)<EPSILON) return false;
+    t=dot(pl.center.xyz-O,norm)/denom;
+    if(t<=0.0) return false;
+    vec3 hit=O+t*D;
+    vec3 local=hit-pl.center.xyz;
+    if(abs(dot(local,pl.edge1.xyz))>pl.u*0.5||abs(dot(local,pl.edge2.xyz))>pl.v*0.5) return false;
+    P=hit; N=norm; return true;
+}
+bool intersectSphere(Sphere sp,HitData hd,out vec3 P,out vec3 N, out float t){
+    vec3 O=hd.hit.xyz, D=hd.wo.xyz;
+    float r=sp.center_radius.w;
+    vec3 oc=O-sp.center_radius.xyz;
+    float a=dot(D,D),b=2*dot(oc,D),c=dot(oc,oc)-r*r;
+    float disc=b*b-4*a*c; if(disc<0.0) return false;
+    float sd=sqrt(disc),t0=(-b-sd)/(2*a),t1=(-b+sd)/(2*a);
+    t=t0>0.0?t0:t1; if(t<=0.0) return false;
+    P=O+t*D; N=normalize(P-sp.center_radius.xyz); return true;
+}
+
+// ---------------------------------------------------------
+// Scatter & throughput
+// ---------------------------------------------------------
+vec3 fillHitDataPlane(Plane pl,vec3 P,inout HitData hd,inout PRNG32 rng){
+    hd.hit.xyz=P;
+    hd.normal.xyz=normalize(cross(pl.edge1.xyz,pl.edge2.xyz));
+    Sample s=sampleDiffuse(hd.normal.xyz,rng);
+    hd.wo=vec4(s.dir,0.0);
+    return pl.mat.albedo_refractiveIdx.xyz;
+}
+vec3 fillHitDataSphere(Sphere sp,vec3 P,inout HitData hd,inout PRNG32 rng){
+    hd.hit.xyz=P;
+    hd.normal.xyz=normalize(P-sp.center_radius.xyz);
+    Sample s=sampleDiffuse(hd.normal.xyz,rng);
+    hd.wo=vec4(s.dir,0.0);
+    return sp.mat.albedo_refractiveIdx.xyz;
+}
+
+bool Trace(inout HitData hd,inout PRNG32 rng,out Material m,out vec3 thr){
+    float tMin=MAX_FLOAT; uint shape=null_shape,idx=0u;
+    vec3 P,N;
+    for(uint i=0;i<max(constants.numPlanes,constants.numSpheres);++i){
+        float t0; vec3 p0,n0;
+        if(i<constants.numPlanes && intersectPlane(planes[i],hd,p0,n0,t0)&&t0<tMin){tMin=t0;shape=plane_shape;idx=i;P=p0;N=n0;}
+        if(i<constants.numSpheres&& intersectSphere(spheres[i],hd,p0,n0,t0)&&t0<tMin){tMin=t0;shape=sphere_shape;idx=i;P=p0;N=n0;}
+    }
+    if(shape==null_shape) return false;
+    vec3 hitP=P+N*DISPLACEMENT;
+    if(shape==plane_shape){ thr=fillHitDataPlane(planes[idx],hitP,hd,rng); m=planes[idx].mat; }
+    else            { thr=fillHitDataSphere(spheres[idx],hitP,hd,rng); m=spheres[idx].mat; }
+    return true;
+}
+
+// ---------------------------------------------------------
+// Main with Russian Roulette
+// ---------------------------------------------------------
+void main(){
+    ivec2 gid=ivec2(gl_GlobalInvocationID.xy);
+    ivec2 sz=imageSize(StorageImage);
+    uint i=gid.y*sz.x+gid.x;
+    PixelData pd=pixel_data[i];
+    uint depth_uint = uint(pd.radiance_currentRay.w);
+    HitData hd=hit_data[i*constants.rpp+depth_uint];
+    PRNG32 rng=prng32[i];
+
+    // init
+    if(depth_uint==0u){ hd.throughput_depth=vec4(1.0); hit_data[i*constants.rpp]=hd; }
+
+    Material mat; vec3 thr; bool hit=Trace(hd,rng,mat,thr);
+    vec3 throughput=hd.throughput_depth.xyz;
+    float depth=hd.throughput_depth.w;
+
+    if(!hit){ pd.radiance_currentRay.xyz+=throughput*void_color*(1.0/float(constants.rpp)); }
+    else if(uint(mat.type_pad3.x)==emissive_mat){ pd.radiance_currentRay.xyz+=throughput*mat.emissive_reflectiveIdx.xyz*(1.0/float(constants.rpp)); }
+    else {
+        // diffuse bounce
+        throughput*=thr;
+        depth+=1.0;
+
+        // Russian Roulette after 3 bounces
+        if(depth>=3.0){
+            float q=clamp(max(max(throughput.x,throughput.y),throughput.z),0.05,1.0);
+            if(random(rng)>q){ pd.radiance_currentRay.xyz+=throughput*void_color*(1.0/float(constants.rpp));
+                imageStore(StorageImage,gid,vec4(pd.radiance_currentRay.xyz,1.0)); return; }
+            throughput/=q;
+        }
+
+        // write back path state
+        hd.throughput_depth.xyz=throughput;
+        hd.throughput_depth.w=depth;
+        hit_data[i*constants.rpp+uint(depth)]=hd;
+        pixel_data[i]=pd;
+        prng32[i]=rng;
+        return;
+    }
+
+    imageStore(StorageImage,gid,vec4(pd.radiance_currentRay.xyz,1.0));
+    pixel_data[i]=pd;
+}
+
