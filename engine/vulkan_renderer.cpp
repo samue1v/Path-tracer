@@ -328,15 +328,15 @@ void VulkanRender::initializeScene() {
        {1.0, .0, .0, .0}} 
   });
 
-  float angle = glm::radians(89.);
+  float angle = glm::radians(45.);
   glm::mat4 rot = glm::rotate(glm::mat4(1.0f), angle, glm::vec3(1.f, 0.f, 0.f));
   //Refract plane test
   compute.planes.push_back(
-      {glm::vec4(0.f, 0.f, -320.f, 1.f),
+      {glm::vec4(0.f, 0.f, -280.f, 1.f),
        rot*glm::vec4(1.f, 0.f, 0.f, 0.f),
        rot*glm::vec4(0.f, 1.f, 0.f, 0.f),
-       glm::vec4(200.f + overlap, 200.f + overlap, 0.f, 0.f),
-       {{0.6f, 0.6f, 0.6f, 0.75f}, {0., 0., 0., 0.}, {2.0, .0, .0, .0}}});
+       glm::vec4(100.f + overlap, 100.f + overlap, 0.f, 0.f),
+       {{0.6f, 0.6f, 0.6f, 1.f}, {0., 0., 0., 0.}, {2.0, .0, .0, .0}}});
 
 
 
