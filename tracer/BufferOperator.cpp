@@ -1,7 +1,7 @@
 #include "BufferOperator.hpp"
 #include "Logger.hpp"
-#include <glm/gtc/matrix_transform.hpp>
 #include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 
 void BufferOperator::uploadToVRAM(vk::Device logicalDevice,
                                   vk::CommandPool cmdPool, vk::Queue queue,
@@ -119,11 +119,11 @@ void MultiJitterOperator::doOperation(vk::Device logicalDevice,
   float stride_minor = stride_major / (float)root;
   glm::vec4 upper_left(-(float)range.x / 2.f, (float)range.y / 2.f, 0, 1.f);
 
-   for (uint32_t i = 0; i < range.x * range.y; i++) {
-     uint32_t c_major = i % range.x;
-     uint32_t r_major = i / range.x;
-     float x_major = upper_left.x + (float)c_major * stride_major;
-     float y_major = upper_left.y - (float)r_major * stride_major;
+  for (uint32_t i = 0; i < range.x * range.y; i++) {
+    uint32_t c_major = i % range.x;
+    uint32_t r_major = i / range.x;
+    float x_major = upper_left.x + (float)c_major * stride_major;
+    float y_major = upper_left.y - (float)r_major * stride_major;
 
     for (uint32_t j = 0; j < vpps; j++) {
       uint32_t c_minor = j % root;
@@ -131,8 +131,8 @@ void MultiJitterOperator::doOperation(vk::Device logicalDevice,
 
       float x_base =
           x_major + (float)c_minor * stride_minor + stride_minor / 2.f;
-      float y_base = y_major - (float)r_minor * stride_minor -
-                     stride_minor / 2.f;
+      float y_base =
+          y_major - (float)r_minor * stride_minor - stride_minor / 2.f;
 
       float jitter_x = (dist(gen) - 0.5f) * stride_minor;
       float jitter_y = (dist(gen) - 0.5f) * stride_minor;
@@ -143,9 +143,62 @@ void MultiJitterOperator::doOperation(vk::Device logicalDevice,
       pHitData[i * vpps + j].hit = cam.pos;
       pHitData[i * vpps + j].wo = glm::normalize(viewport_hit - cam.pos);
       pHitData[i * vpps + j].normal = glm::vec4(0.0f, 0.0f, -1.0f, 0.0f);
-      pHitData[i * vpps + j].throughput_depth = glm::vec4(1.0f, 1.0f, 1.0f, 0.0f);
+      pHitData[i * vpps + j].throughput_depth =
+          glm::vec4(1.0f, 1.0f, 1.0f, 0.0f);
     }
   }
+
+  // uint32_t vpps = _rpp;
+
+  //// Ensure vpps is perfect square
+  // uint32_t root = static_cast<uint32_t>(std::sqrt(vpps));
+  // assert(root * root == vpps && vpps != 0);
+
+  // float fov_deg = 90.0f;
+  // float fov_rad = glm::radians(fov_deg);
+
+  // float scale = tan(fov_rad * 0.5f);
+
+  // float aspect = (float)range.x / (float)range.y;
+  //// Camera basis vectors from view matrix (assumes column-major glm::mat4)
+  // glm::vec3 forward = -glm::normalize(glm::vec3(cam.view[2])); // -Z
+  // glm::vec3 right = glm::normalize(glm::vec3(cam.view[0]));    // +X
+  // glm::vec3 up = glm::normalize(glm::vec3(cam.view[1]));       // +Y
+
+  // for (uint32_t i = 0; i < range.x * range.y; i++) {
+  //   uint32_t c_major = i % range.x;
+  //   uint32_t r_major = i / range.x;
+
+  //  for (uint32_t j = 0; j < vpps; j++) {
+  //    uint32_t c_minor = j % root;
+  //    uint32_t r_minor = j / root;
+
+  //    // Normalized device coordinates in [0, 1]
+  //    float x_ndc = (float(c_major) + (float(c_minor) + 0.5f) / root) /
+  //    range.x; float y_ndc = (float(r_major) + (float(r_minor) + 0.5f) / root)
+  //    / range.y;
+
+  //    // Map to [-1, 1] with correct aspect ratio
+  //    float x = (x_ndc - 0.5f) * aspect;
+  //    float y = (0.5f - y_ndc);
+
+  //    // Optional jitter
+  //    float jitter_x = (dist(gen) - 0.5f) / range.x;
+  //    float jitter_y = (dist(gen) - 0.5f) / range.y;
+
+  //    x += jitter_x * aspect;
+  //    y += jitter_y;
+
+  //    glm::vec3 direction = glm::normalize(forward + x * right*scale + y *
+  //    up*scale);
+
+  //    uint32_t index = i * vpps + j;
+  //    pHitData[index].hit = cam.pos;
+  //    pHitData[index].wo = glm::vec4(direction, 0.f);
+  //    pHitData[index].normal = glm::vec4(0.0f, 0.0f, -1.0f, 0.0f);
+  //    pHitData[index].throughput_depth = glm::vec4(1.0f, 1.0f, 1.0f, 0.0f);
+  //  }
+  //}
 
   uploadToVRAM(logicalDevice, cmdPool, queue, allocator, buffer,
                size * sizeof(Tracer::hitData), pHitData.data());
@@ -163,7 +216,7 @@ void CameraPositionOperator::doOperation(vk::Device logicalDevice,
   pCamera[0].pos = _camera.pos;
   pCamera[0].view = _camera.view;
   pCamera[0].invView = _camera.invView;
-;
+  ;
 
   uploadToVRAM(logicalDevice, cmdPool, queue, allocator, buffer,
                size * sizeof(Tracer::camera), pCamera.data());
@@ -177,8 +230,6 @@ void SphereFillOperator::doOperation(vk::Device logicalDevice,
                                      vk::CommandPool cmdPool, vk::Queue queue,
                                      Buffer &buffer, size_t size,
                                      VmaAllocator allocator) {
-
-
 
   std::vector<Tracer::sphere> pSpheres(size);
   for (uint32_t i = 0; i < _spheres.size(); i++) {

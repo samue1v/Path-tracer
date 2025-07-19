@@ -262,7 +262,7 @@ void VulkanRender::initializeScene() {
   compute.cameraUniform.pos = glm::vec4(0.0f, 0.0f, vp_dist, 1.0f);
   compute.cameraUniform.view =
       glm::lookAt(glm::vec3(0.f, 0.f, vp_dist), glm::vec3(0.f, 0.f, -1.f),
-                  glm::vec3(0.f, 0.f, 0.f));
+                  glm::vec3(0.f, 1.f, 0.f));
   compute.cameraUniform.invView = glm::inverse(compute.cameraUniform.view);
 
   const float overlap = 0.001f;
@@ -276,7 +276,7 @@ void VulkanRender::initializeScene() {
       glm::vec4(1.f, 0.f, 0.f, 0.f),    // edge1 = X
       glm::vec4(0.f, 0.f, -1.f, 0.f),   // edge2 = Z
       glm::vec4(640.f + overlap, 1280.f + overlap, 0.f, 0.f),
-      {{0.6f, 0.6f, 0.6f, 1.0f},
+      {{0.47f, 0.17f, 0.10f, 1.0f},
        {0.6f, 0.6f, 0.6f, 1.0},
        {0., 0., 0., 0.}}, // Gray
 
@@ -303,7 +303,9 @@ void VulkanRender::initializeScene() {
        glm::vec4(0.f, 0.f, 1.f, 0.f),
        glm::vec4(0.f, -1.f, 0.f, 0.f),
        glm::vec4(1280.f + overlap, 640.f + overlap, 0.f, 0.f),
-       {{0.0f, 0.0f, 0.8f, 1.0f}, {0., 0., 0., 0.}, {0.0, .0, .0, .0}}});
+       {{0.14453125, 0.3359375, 0.9296875, 1.0f},
+        {0., 0., 0., 0.},
+        {0.0, .0, .0, .0}}});
 
   // Right wall (parede direita)
   compute.planes.push_back(
@@ -311,7 +313,7 @@ void VulkanRender::initializeScene() {
        glm::vec4(0.f, 0.f, 1.f, 0.f),
        glm::vec4(0.f, 1.f, 0.f, 0.f),
        glm::vec4(1280.f + overlap, 640.f + overlap, 0.f, 0.f),
-       {{0.0f, 0.8f, 0.0f, 1.0f}, {0., 0., 0., 0.}, {0.0, .0, .0, .0}}});
+       {{0.1f, 0.4f, 0.f, 1.0f}, {0., 0., 0., .3}, {0.0, .0, .0, .0}}});
 
   // Front wall (parede atrás da câmera)
   compute.planes.push_back(
@@ -321,12 +323,12 @@ void VulkanRender::initializeScene() {
        glm::vec4(640.f + overlap, 640.f + overlap, 0.f, 0.f),
        {{0.6f, 0.6f, 0.6f, 1.0f}, {0., 0., 0., 0.}, {0.0, .0, .0, .0}}});
 
-   compute.spheres.push_back({
-       glm::vec4(-240.f, -100.f, -560.f, 80.f), // position (x, y, z) + radius
-       {{0.4f, 0.0f, 0.0f, 1.f},
-        {0., 0., 0., 0.},
-        {0.0, .0, .0, .0}} // white color in BGR
-   });
+  compute.spheres.push_back({
+      glm::vec4(-240.f, -100.f, -560.f, 80.f), // position (x, y, z) +
+      {{0.4f, 0.0f, 0.0f, 1.f},
+       {0., 0., 0., 0.2},
+       {1.0, .0, .0, .0}} // white color in BGR
+  });
 
   // compute.planes.push_back(
   //     {glm::vec4(0.f, -100.f, -550.f, 1.f),
@@ -335,30 +337,21 @@ void VulkanRender::initializeScene() {
   //      glm::vec4(80.f,80.f,0.f,0.f),
   //      {{0.6f, 0.f, 0.f, 1.0f}, {0., 0., 0., 0.}, {0.0, .0, .0, .0}}});
 
- compute.spheres.push_back({
-     glm::vec4(0.f, 0.f, -600.f, 80.f), // center + radius
-     {{0.0f, 0.8f, 0.8f, 1.0f},
-      {0., 0., 0., 0.},
-      {0.0, .0, .0, .0}} // Cyan-ish color (BGR)
- });
+  compute.spheres.push_back({
+      glm::vec4(0.f, 0.f, -600.f, 80.f), // center + radius
+      {{0.0f, 0.8f, 0.8f, 1.0f},
+       {0., 0., 0., 0.},
+       {0.0, .0, .0, .0}} // Cyan-ish color (BGR)
+  });
 
-  // Plane light (luz do teto)
+  // Plane light(luz do teto)
   compute.planes.push_back({glm::vec4(0.f, 319.f, 0.f, 1.f),
                             glm::vec4(1.f, 0.f, 0.f, 0.f),
                             glm::vec4(0.f, 0.f, 1.f, 0.f),
-                            glm::vec4(200.f, 400.f, 0.f, 0.f),
+                            glm::vec4(320.f, 640.f, 0.f, 0.f),
                             {{1.f, 1.f, 1.f, 1.0f},
-                             {100.f, 100.f, 100.f, 0.0f},
+                             {20.f, 20.f, 20.f, 0.0f},
                              {4.0, .0, .0, .0}}});
-
-  // compute.planes.push_back(
-  //     {glm::vec4(0.f, 0.f, -639.f, 1.f),
-  //      glm::vec4(1.f, 0.f, 0.f, 0.f),
-  //      glm::vec4(0.f, 1.f, 0.f, 0.f),
-  //      glm::vec4(200.f,400.f,0.f,0.f),
-  //      {{1.f, 1.f, 1.f, 1.0f}, {100.f, 100.f, 100.f, 0.0f}, {4.0, .0, .0,
-  //      .0}}});
-  //}
 }
 
 void VulkanRender::initializeBuffers() {
@@ -464,7 +457,7 @@ void VulkanRender::drawFrame() {
       std::ostringstream oss;
       oss << std::put_time(&local_tm, "%Y-%m-%d %H:%M:%S");
 
-      //Logger::log(Logger::LogLevel::DEBUG, "Compute done at: " + oss.str());
+      // Logger::log(Logger::LogLevel::DEBUG, "Compute done at: " + oss.str());
     }
     // logicalDevice.waitForFences(1,&compute.computeFence,1, UINT64_MAX);
   }
