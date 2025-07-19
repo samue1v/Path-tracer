@@ -373,19 +373,26 @@ vec3 fillHitData(in Sphere sphere, in vec3 hit_p, inout HitData hd, inout PRNG32
 		float cosTheta = max(dot(hd.normal.xyz, wi_pdf.dir), 0.0);
 		result =  fresnelSchlick(cosTheta, vec3(sphere.mat.emissive_reflectiveIdx.w));
 	}
-	//else if(sphere.mat.type_pad3.x == refractive_mat){
-	//	float eta = sphere.mat.albedo_refractiveIdx.w;
-	//	if(dot(hd.normal.xyz,hd.wo.xyz) > 0.){
-	//		hd.normal.xyz = -hd.normal.xyz;
-	//		eta = 1.0/eta;
-	//		
-	//	}
-	//	wi_pdf = sampleRefractive(hd.wo.xyz,hd.normal.xyz,eta);
-	//	hd.wo = vec4(wi_pdf.dir,0.0);
-	//	float cosTheta = max(dot(hd.normal.xyz, wi_pdf.dir), 0.0);
-	//	result = fresnelSchlick(cosTheta, vec3(sphere.mat.albedo_refractiveIdx.xyz));
-	//}
 
+	else if(sphere.mat.type_pad3.x == refractive_mat){
+		vec3 original_wo = hd.wo.xyz;
+		float eta = sphere.mat.albedo_refractiveIdx.w;
+		if(dot(original_wo, n) >= 0.0){
+			n = -n;
+			eta = 1.0/eta;
+		}
+		hd.normal.xyz = n;
+
+		float cosThetaI = max(dot(n, -original_wo), 0.0);
+		Fresnel F = fresnelSchlick(original_wo, n, sphere.mat.albedo_refractiveIdx.xyz,eta);
+		if(!F.TIR){
+			n = -n;
+		}
+		wi_pdf.dir = F.wi;
+		wi_pdf.pdf = 1.0;
+		hd.wo = vec4(F.wi,0.0);
+		result = F.throughput;
+	}
 	
 	//Floating point correction
 	hit_p = hit_p + DISPLACEMENT*n;

@@ -267,7 +267,6 @@ void VulkanRender::initializeScene() {
 
   const float overlap = 0.001f;
 
-
   // Floor (chão)
   compute.planes.push_back({
       glm::vec4(0.f, -320.f, 0.f, 1.f), // Center
@@ -321,32 +320,23 @@ void VulkanRender::initializeScene() {
        glm::vec4(640.f + overlap, 640.f + overlap, 0.f, 0.f),
        {{0.6f, 0.6f, 0.6f, 1.0f}, {0., 0., 0., 0.}, {0.0, .0, .0, .0}}});
 
-  compute.spheres.push_back({
-      glm::vec4(-240.f, -100.f, -560.f, 80.f),
-      {{0.4f, 0.4f, 0.4f, 1.f},
-       {0., 0., 0., 0.2},
-       {1.0, .0, .0, .0}} 
-  });
+  compute.spheres.push_back(
+      {glm::vec4(-240.f, -100.f, -560.f, 80.f),
+       {{0.4f, 0.4f, 0.4f, 1.f}, {0., 0., 0., 0.2}, {1.0, .0, .0, .0}}});
 
   float angle = glm::radians(45.);
   glm::mat4 rot = glm::rotate(glm::mat4(1.0f), angle, glm::vec3(1.f, 0.f, 0.f));
-  //Refract plane test
-  compute.planes.push_back(
-      {glm::vec4(0.f, 0.f, -280.f, 1.f),
-       rot*glm::vec4(1.f, 0.f, 0.f, 0.f),
-       rot*glm::vec4(0.f, 1.f, 0.f, 0.f),
-       glm::vec4(100.f + overlap, 100.f + overlap, 0.f, 0.f),
-       {{0.6f, 0.6f, 0.6f, 1.f}, {0., 0., 0., 0.}, {2.0, .0, .0, .0}}});
+  // Refract plane test
+  // compute.planes.push_back(
+  //     {glm::vec4(0.f, 0.f, -280.f, 1.f),
+  //      rot*glm::vec4(1.f, 0.f, 0.f, 0.f),
+  //      rot*glm::vec4(0.f, 1.f, 0.f, 0.f),
+  //      glm::vec4(100.f + overlap, 100.f + overlap, 0.f, 0.f),
+  //      {{0.6f, 0.6f, 0.6f, 1.f}, {0., 0., 0., 0.}, {2.0, .0, .0, .0}}});
 
-
-
-  //compute.spheres.push_back({
-  //    glm::vec4(-240.f, -100.f, -560.f, 80.f), // position (x, y, z) +
-  //    {{0.4f, 0.0f, 0.0f, 1.f},
-  //     {0., 0., 0., 0.2},
-  //     {1.0, .0, .0, .0}} // white color in BGR
-  //});
-
+  compute.spheres.push_back(
+      {glm::vec4(0.f, -60.f, -200.f, 40.f), // position (x, y, z) +
+       {{0.4f, 0.4f, 0.4f, 4.f}, {0., 0., 0., 0.2}, {2.0, .0, .0, .0}}});
 
   compute.spheres.push_back({
       glm::vec4(0.f, 0.f, -600.f, 80.f), // center + radius
@@ -356,13 +346,12 @@ void VulkanRender::initializeScene() {
   });
 
   // Plane light(luz do teto)
-  compute.planes.push_back({glm::vec4(0.f, 319.f, 0.f, 1.f),
-                            glm::vec4(1.f, 0.f, 0.f, 0.f),
-                            glm::vec4(0.f, 0.f, 1.f, 0.f),
-                            glm::vec4(320.f, 640.f, 0.f, 0.f),
-                            {{1.f, 1.f, 1.f, 1.0f},
-                             {10.f, 10.f, 10.f, 0.0f},
-                             {4.0, .0, .0, .0}}});
+  compute.planes.push_back(
+      {glm::vec4(0.f, 319.f, 0.f, 1.f),
+       glm::vec4(1.f, 0.f, 0.f, 0.f),
+       glm::vec4(0.f, 0.f, 1.f, 0.f),
+       glm::vec4(320.f, 640.f, 0.f, 0.f),
+       {{1.f, 1.f, 1.f, 1.0f}, {10.f, 10.f, 10.f, 0.0f}, {4.0, .0, .0, .0}}});
 }
 
 void VulkanRender::initializeBuffers() {
