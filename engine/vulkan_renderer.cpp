@@ -265,14 +265,15 @@ void VulkanRender::initializeScene() {
                   glm::vec3(0.f, 1.f, 0.f));
   compute.cameraUniform.invView = glm::inverse(compute.cameraUniform.view);
 
-  const float overlap = 0.001f;
+  const float scale = 640.f;
+  const float overlap = 0.001/scale;
 
   // Floor (chão)
   compute.planes.push_back({
-      glm::vec4(0.f, -320.f, 0.f, 1.f), // Center
+      glm::vec4(0.f, -0.5f, 0.f, 1.f/scale)*scale, // Center
       glm::vec4(1.f, 0.f, 0.f, 0.f),    // edge1 = X
       glm::vec4(0.f, 0.f, -1.f, 0.f),   // edge2 = Z
-      glm::vec4(640.f + overlap, 1280.f + overlap, 0.f, 0.f),
+      glm::vec4(1.f + overlap, 2.f + overlap, 0.f, 0.f)*scale,
       {{0.47f, 0.17f, 0.10f, 1.0f},
        {0.6f, 0.6f, 0.6f, 1.0},
        {0., 0., 0., 0.}}, // Gray
@@ -280,48 +281,49 @@ void VulkanRender::initializeScene() {
   });
   // Ceiling (teto)
   compute.planes.push_back(
-      {glm::vec4(0.f, 320.f, 0.f, 1.f),
+
+      {glm::vec4(0.f, 0.5f, 0.f, 1.f/scale)*scale,
        glm::vec4(1.f, 0.f, 0.f, 0.f),
        glm::vec4(0.f, 0.f, 1.f, 0.f),
-       glm::vec4(640.f + overlap, 1280.f + overlap, 0.f, 0.f),
+       glm::vec4(1.f + overlap, 2.f + overlap, 0.f, 0.f)*scale,
        {{0.6f, 0.6f, 0.6f, 1.0f}, {0., 0., 0., 0.}, {0.0, 0., 0., 0.}}});
 
   // Back wall (fundo da caixa)
   compute.planes.push_back(
-      {glm::vec4(0.f, 0.f, -640.f, 1.f),
+      {glm::vec4(0.f, 0.f, -1.f, 1.f/scale)*scale,
        glm::vec4(1.f, 0.f, 0.f, 0.f),
        glm::vec4(0.f, 1.f, 0.f, 0.f),
-       glm::vec4(640.f + overlap, 640.f + overlap, 0.f, 0.f),
+       glm::vec4(1.f + overlap, 1.f + overlap, 0.f, 0.f)*scale,
        {{0.6f, 0.6f, 0.6f, 1.0f}, {0., 0., 0., 0.}, {0.0, 0., 0., 0.}}});
 
   // Left wall (parede esquerda)
   compute.planes.push_back(
-      {glm::vec4(-320.f, 0.f, 0.f, 1.f),
+      {glm::vec4(-0.5f, 0.f, 0.f, 1.f/scale)*scale,
        glm::vec4(0.f, 0.f, 1.f, 0.f),
        glm::vec4(0.f, -1.f, 0.f, 0.f),
-       glm::vec4(1280.f + overlap, 640.f + overlap, 0.f, 0.f),
+       glm::vec4(1280.f + overlap, 640.f + overlap, 0.f, 0.f)*scale,
        {{0.14453125, 0.3359375, 0.9296875, 1.0f},
         {0., 0., 0., 0.},
         {0.0, .0, .0, .0}}});
 
   // Right wall (parede direita)
   compute.planes.push_back(
-      {glm::vec4(320.f, 0.f, 0.f, 1.f),
+      {glm::vec4(0.5f, 0.f, 0.f, 1.f/scale)*scale,
        glm::vec4(0.f, 0.f, 1.f, 0.f),
        glm::vec4(0.f, 1.f, 0.f, 0.f),
-       glm::vec4(1280.f + overlap, 640.f + overlap, 0.f, 0.f),
+       glm::vec4(2.f + overlap, 1.f + overlap, 0.f, 0.f)*scale,
        {{0.1f, 0.4f, 0.f, 1.0f}, {0., 0., 0., .3}, {0.0, .0, .0, .0}}});
 
   // Front wall (parede atrás da câmera)
   compute.planes.push_back(
-      {glm::vec4(0.f, 0.f, 640.f, 1.f),
+      {glm::vec4(0.f, 0.f, 1.f, 1.f/scale)*scale,
        glm::vec4(1.f, 0.f, 0.f, 0.f),
        glm::vec4(0.f, -1.f, 0.f, 0.f),
-       glm::vec4(640.f + overlap, 640.f + overlap, 0.f, 0.f),
+       glm::vec4(1.f + overlap, 1.f + overlap, 0.f, 0.f)*scale,
        {{0.6f, 0.6f, 0.6f, 1.0f}, {0., 0., 0., 0.}, {0.0, .0, .0, .0}}});
 
   compute.spheres.push_back(
-      {glm::vec4(-240.f, -100.f, -560.f, 80.f),
+      {glm::vec4(-0.35f, -0.15f, -0.8f, 0.125f)*scale,
        {{0.4f, 0.4f, 0.4f, 1.f}, {0., 0., 0., 0.2}, {1.0, .0, .0, .0}}});
 
   float angle = glm::radians(45.);
@@ -335,11 +337,11 @@ void VulkanRender::initializeScene() {
   //      {{0.6f, 0.6f, 0.6f, 1.f}, {0., 0., 0., 0.}, {2.0, .0, .0, .0}}});
 
   compute.spheres.push_back(
-      {glm::vec4(0.f, -60.f, -200.f, 40.f), // position (x, y, z) +
-       {{0.4f, 0.4f, 0.4f, 4.f}, {0., 0., 0., 0.2}, {2.0, .0, .0, .0}}});
+      {glm::vec4(0.f, -0.1f, -0.3f, 0.125f/2.f)*scale, // position (x, y, z) +
+       {{0.4f, 0.4f, 0.4f, 0.66f}, {0., 0., 0., 0.2}, {2.0, .0, .0, .0}}});
 
   compute.spheres.push_back({
-      glm::vec4(0.f, 0.f, -600.f, 80.f), // center + radius
+      glm::vec4(0.f, 0.f, -0.9f, 0.25f/2.f)*scale, // center + radius
       {{0.0f, 0.8f, 0.8f, 1.0f},
        {0., 0., 0., 0.},
        {0.0, .0, .0, .0}} // Cyan-ish color (BGR)
@@ -347,10 +349,10 @@ void VulkanRender::initializeScene() {
 
   // Plane light(luz do teto)
   compute.planes.push_back(
-      {glm::vec4(0.f, 319.f, 0.f, 1.f),
+      {glm::vec4(0.f, 0.49f, 0.f, 1.f/scale)*scale,
        glm::vec4(1.f, 0.f, 0.f, 0.f),
        glm::vec4(0.f, 0.f, 1.f, 0.f),
-       glm::vec4(320.f, 640.f, 0.f, 0.f),
+       glm::vec4(0.5f, 1.f, 0.f, 0.f)*scale,
        {{1.f, 1.f, 1.f, 1.0f}, {10.f, 10.f, 10.f, 0.0f}, {4.0, .0, .0, .0}}});
 }
 

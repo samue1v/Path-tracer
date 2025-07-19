@@ -43,9 +43,6 @@ public:
   struct Graphics {
 
     vk::DescriptorSetLayout descriptorSetLayout{VK_NULL_HANDLE};
-    vk::DescriptorSet descriptorSetPreCompute{VK_NULL_HANDLE};
-    vk::DescriptorSet descriptorSetPostCompute{VK_NULL_HANDLE};
-
     Pipeline pipeline;
     vk::PipelineLayout pipelineLayout{VK_NULL_HANDLE};
     vk::Semaphore acquireSemaphore, releaseSemaphore, copySemaphore;
@@ -64,7 +61,7 @@ public:
   // Resources for the compute part of the example
   struct Compute {
 
-    static constexpr uint32_t rays_per_pixel = 19*19;
+    static constexpr uint32_t rays_per_pixel = 16*16;
     static constexpr uint32_t MAX_OBJECT_SIZE = 20;
 
     vk::Queue queue;
