@@ -253,27 +253,29 @@ void VulkanRender::createBufferResources() {
 }
 
 void VulkanRender::initializeScene() {
+
+  const float scale = 640.f;
   // Initialize camera
   float viewportWidth = (float)chain.extent.width;
   float fov_deg = 60.0f;
   float fov_rad = glm::radians(fov_deg);
 
-  float vp_dist = (viewportWidth * 0.5f) / tan(fov_rad * 0.5f);
-  compute.cameraUniform.pos = glm::vec4(0.0f, 0.0f, vp_dist, 1.0f);
-  compute.cameraUniform.view =
-      glm::lookAt(glm::vec3(0.f, 0.f, vp_dist), glm::vec3(0.f, 0.f, -1.f),
-                  glm::vec3(0.f, 1.f, 0.f));
+  float vp_dist = (viewportWidth * 0.5f) / tan(fov_rad * 0.5f) / scale;
+  compute.cameraUniform.pos =
+      glm::vec4(0.4f, 0.4f, (vp_dist - 0.2), 1.0f / scale) * scale;
+  compute.cameraUniform.view = glm::lookAt(glm::vec3(compute.cameraUniform.pos),
+                                           glm::vec3(0.f, -0.7f, -0.3f) * scale,
+                                           glm::vec3(0.f, 1.f, 0.f) * scale);
   compute.cameraUniform.invView = glm::inverse(compute.cameraUniform.view);
 
-  const float scale = 640.f;
-  const float overlap = 0.001/scale;
+  const float overlap = 0.001 / scale;
 
   // Floor (chão)
   compute.planes.push_back({
-      glm::vec4(0.f, -0.5f, 0.f, 1.f/scale)*scale, // Center
-      glm::vec4(1.f, 0.f, 0.f, 0.f),    // edge1 = X
-      glm::vec4(0.f, 0.f, -1.f, 0.f),   // edge2 = Z
-      glm::vec4(1.f + overlap, 2.f + overlap, 0.f, 0.f)*scale,
+      glm::vec4(0.f, -0.5f, 0.f, 1.f / scale) * scale, // Center
+      glm::vec4(1.f, 0.f, 0.f, 0.f),                   // edge1 = X
+      glm::vec4(0.f, 0.f, -1.f, 0.f),                  // edge2 = Z
+      glm::vec4(1.f + overlap, 2.f + overlap, 0.f, 0.f) * scale,
       {{0.47f, 0.17f, 0.10f, 1.0f},
        {0.6f, 0.6f, 0.6f, 1.0},
        {0., 0., 0., 0.}}, // Gray
@@ -282,48 +284,48 @@ void VulkanRender::initializeScene() {
   // Ceiling (teto)
   compute.planes.push_back(
 
-      {glm::vec4(0.f, 0.5f, 0.f, 1.f/scale)*scale,
+      {glm::vec4(0.f, 0.5f, 0.f, 1.f / scale) * scale,
        glm::vec4(1.f, 0.f, 0.f, 0.f),
        glm::vec4(0.f, 0.f, 1.f, 0.f),
-       glm::vec4(1.f + overlap, 2.f + overlap, 0.f, 0.f)*scale,
+       glm::vec4(1.f + overlap, 2.f + overlap, 0.f, 0.f) * scale,
        {{0.6f, 0.6f, 0.6f, 1.0f}, {0., 0., 0., 0.}, {0.0, 0., 0., 0.}}});
 
   // Back wall (fundo da caixa)
   compute.planes.push_back(
-      {glm::vec4(0.f, 0.f, -1.f, 1.f/scale)*scale,
+      {glm::vec4(0.f, 0.f, -1.f, 1.f / scale) * scale,
        glm::vec4(1.f, 0.f, 0.f, 0.f),
        glm::vec4(0.f, 1.f, 0.f, 0.f),
-       glm::vec4(1.f + overlap, 1.f + overlap, 0.f, 0.f)*scale,
+       glm::vec4(1.f + overlap, 1.f + overlap, 0.f, 0.f) * scale,
        {{0.6f, 0.6f, 0.6f, 1.0f}, {0., 0., 0., 0.}, {0.0, 0., 0., 0.}}});
 
   // Left wall (parede esquerda)
   compute.planes.push_back(
-      {glm::vec4(-0.5f, 0.f, 0.f, 1.f/scale)*scale,
+      {glm::vec4(-0.5f, 0.f, 0.f, 1.f / scale) * scale,
        glm::vec4(0.f, 0.f, 1.f, 0.f),
        glm::vec4(0.f, -1.f, 0.f, 0.f),
-       glm::vec4(1280.f + overlap, 640.f + overlap, 0.f, 0.f)*scale,
+       glm::vec4(1280.f + overlap, 640.f + overlap, 0.f, 0.f) * scale,
        {{0.14453125, 0.3359375, 0.9296875, 1.0f},
         {0., 0., 0., 0.},
         {0.0, .0, .0, .0}}});
 
   // Right wall (parede direita)
   compute.planes.push_back(
-      {glm::vec4(0.5f, 0.f, 0.f, 1.f/scale)*scale,
+      {glm::vec4(0.5f, 0.f, 0.f, 1.f / scale) * scale,
        glm::vec4(0.f, 0.f, 1.f, 0.f),
        glm::vec4(0.f, 1.f, 0.f, 0.f),
-       glm::vec4(2.f + overlap, 1.f + overlap, 0.f, 0.f)*scale,
+       glm::vec4(2.f + overlap, 1.f + overlap, 0.f, 0.f) * scale,
        {{0.1f, 0.4f, 0.f, 1.0f}, {0., 0., 0., .3}, {0.0, .0, .0, .0}}});
 
   // Front wall (parede atrás da câmera)
   compute.planes.push_back(
-      {glm::vec4(0.f, 0.f, 1.f, 1.f/scale)*scale,
+      {glm::vec4(0.f, 0.f, 1.f, 1.f / scale) * scale,
        glm::vec4(1.f, 0.f, 0.f, 0.f),
        glm::vec4(0.f, -1.f, 0.f, 0.f),
-       glm::vec4(1.f + overlap, 1.f + overlap, 0.f, 0.f)*scale,
+       glm::vec4(1.f + overlap, 1.f + overlap, 0.f, 0.f) * scale,
        {{0.6f, 0.6f, 0.6f, 1.0f}, {0., 0., 0., 0.}, {0.0, .0, .0, .0}}});
 
   compute.spheres.push_back(
-      {glm::vec4(-0.35f, -0.15f, -0.8f, 0.125f)*scale,
+      {glm::vec4(-0.35f, -0.15f, -0.8f, 0.125f) * scale,
        {{0.4f, 0.4f, 0.4f, 1.f}, {0., 0., 0., 0.2}, {1.0, .0, .0, .0}}});
 
   float angle = glm::radians(45.);
@@ -336,23 +338,25 @@ void VulkanRender::initializeScene() {
   //      glm::vec4(100.f + overlap, 100.f + overlap, 0.f, 0.f),
   //      {{0.6f, 0.6f, 0.6f, 1.f}, {0., 0., 0., 0.}, {2.0, .0, .0, .0}}});
 
-  compute.spheres.push_back(
-      {glm::vec4(0.f, -0.1f, -0.3f, 0.125f/2.f)*scale, // position (x, y, z) +
-       {{0.4f, 0.4f, 0.4f, 0.66f}, {0., 0., 0., 0.2}, {2.0, .0, .0, .0}}});
+  // compute.spheres.push_back(
+  //     {glm::vec4(0.f, -0.1f, -0.3f, 0.125f/2.f)*scale,
+  //      {{0.4f, 0.4f, 0.4f, 0.66f}, {0., 0., 0., 0.2}, {2.0, 0.f,
+  //      0.f, 1.f}}});
 
-  compute.spheres.push_back({
-      glm::vec4(0.f, 0.f, -0.9f, 0.25f/2.f)*scale, // center + radius
-      {{0.0f, 0.8f, 0.8f, 1.0f},
-       {0., 0., 0., 0.},
-       {0.0, .0, .0, .0}} // Cyan-ish color (BGR)
-  });
+  compute.spheres.push_back(
+      {glm::vec4(0.f, 0.f, -0.9f, 0.25f / 2.f) * scale,
+       {{0.0f, 0.8f, 0.8f, 1.0f}, {0., 0., 0., 0.}, {0.0, .0, .0, .0}}});
+
+  compute.spheres.push_back(
+      {glm::vec4(0.f, -0.3f, -0.3f, 0.4f / 2.f) * scale,
+       {{0.4f, 0.4f, 0.4f, 0.66f}, {0., 0., 0., 0.2}, {2.0, 0.f, -1.f, 0.f}}});
 
   // Plane light(luz do teto)
   compute.planes.push_back(
-      {glm::vec4(0.f, 0.49f, 0.f, 1.f/scale)*scale,
+      {glm::vec4(0.f, 0.49f, 0.f, 1.f / scale) * scale,
        glm::vec4(1.f, 0.f, 0.f, 0.f),
        glm::vec4(0.f, 0.f, 1.f, 0.f),
-       glm::vec4(0.5f, 1.f, 0.f, 0.f)*scale,
+       glm::vec4(0.5f, 1.f, 0.f, 0.f) * scale,
        {{1.f, 1.f, 1.f, 1.0f}, {10.f, 10.f, 10.f, 0.0f}, {4.0, .0, .0, .0}}});
 }
 
@@ -425,7 +429,7 @@ void VulkanRender::drawFrame() {
   ImGui::NewFrame();
 
   showPerformanceMenu();
-  // showMenu();
+  showMenu();
 
   if (logicalDevice.getFenceStatus(compute.computeFence) ==
       vk::Result::eSuccess) {
@@ -1855,15 +1859,52 @@ void VulkanRender::showPerformanceMenu() {
   ImGui::End();
 }
 
-void VulkanRender::showMenu() {
-  static int r = 0;
-  static int g = 0;
-  static int b = 0;
-  ImGui::SetNextWindowSize(ImVec2(0, 0), ImGuiCond_Always);
-  ImGui::Begin("Color Menu", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
-  ImGui::SliderInt("R", &r, 0, 255, "%d");
-  ImGui::SliderInt("G", &g, 0, 255, "%d");
-  ImGui::SliderInt("B", &b, 0, 255, "%d");
+void VulkanRender::updateCamera(glm::vec3 posDelta, glm::vec3 atDelta) {}
 
+void VulkanRender::showMenu() {
+  static glm::vec3 pos;
+  static glm::vec3 at;
+  ImGui::SetNextWindowSize(ImVec2(0, 0), ImGuiCond_Always);
+  ImGui::Begin("Position Menu", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
+  //  ImGui::InputFloat("Pos X", &xyz_pos.x);
+  //  ImGui::InputFloat("Pos Y", &xyz_pos.y);
+  //  ImGui::InputFloat("Pos Z", &xyz_pos.z);
+  //
+  //  ImGui::InputFloat("At X", &xyz_at.x);
+  //  ImGui::InputFloat("At Y", &xyz_at.y);
+  //  ImGui::InputFloat("At Z", &xyz_at.z);
+  //
+
+  float fullWidth = ImGui::GetContentRegionAvail().x;
+  float spacing = ImGui::GetStyle().ItemSpacing.x;
+  float inputWidth = (fullWidth - spacing * 2) / 3.0f;
+
+  ImGui::Text("Pos:");
+  ImGui::SameLine();
+  ImGui::PushItemWidth(inputWidth);
+  for (int i = 0; i < 3; ++i) {
+    ImGui::PushID(i);
+    ImGui::InputFloat("", &pos[i], 0, 0, "%.3f");
+    ImGui::PopID();
+    if (i < 2)
+      ImGui::SameLine();
+  }
+  ImGui::PopItemWidth();
+
+  ImGui::Text("At :");
+  ImGui::SameLine();
+  ImGui::PushItemWidth(inputWidth);
+  for (int i = 0; i < 3; ++i) {
+    ImGui::PushID(i + 100);
+    ImGui::InputFloat("", &at[i], 0, 0, "%.3f");
+    ImGui::PopID();
+    if (i < 2)
+      ImGui::SameLine();
+  }
+  ImGui::PopItemWidth();
+
+  if (ImGui::Button("OK")) {
+    updateCamera(pos,at);
+  }
   ImGui::End();
 }

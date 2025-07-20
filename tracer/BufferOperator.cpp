@@ -119,87 +119,79 @@ void MultiJitterOperator::doOperation(vk::Device logicalDevice,
   float stride_minor = stride_major / (float)root;
   glm::vec4 upper_left(-(float)range.x / 2.f, (float)range.y / 2.f, 0, 1.f);
 
-  for (uint32_t i = 0; i < range.x * range.y; i++) {
-    uint32_t c_major = i % range.x;
-    uint32_t r_major = i / range.x;
-    float x_major = upper_left.x + (float)c_major * stride_major;
-    float y_major = upper_left.y - (float)r_major * stride_major;
-
-    for (uint32_t j = 0; j < vpps; j++) {
-      uint32_t c_minor = j % root;
-      uint32_t r_minor = j / root;
-
-      float x_base =
-          x_major + (float)c_minor * stride_minor + stride_minor / 2.f;
-      float y_base =
-          y_major - (float)r_minor * stride_minor - stride_minor / 2.f;
-
-      float jitter_x = (dist(gen) - 0.5f) * stride_minor;
-      float jitter_y = (dist(gen) - 0.5f) * stride_minor;
-
-      glm::vec4 viewport_hit =
-          glm::vec4(x_base + jitter_x, y_base + jitter_y, 0, 1.f);
-
-      pHitData[i * vpps + j].hit = cam.pos;
-      pHitData[i * vpps + j].wo = glm::normalize(viewport_hit - cam.pos);
-      pHitData[i * vpps + j].normal = glm::vec4(0.0f, 0.0f, -1.0f, 0.0f);
-      pHitData[i * vpps + j].throughput_depth =
-          glm::vec4(1.0f, 1.0f, 1.0f, 0.0f);
-    }
-  }
-
-  // uint32_t vpps = _rpp;
-
-  //// Ensure vpps is perfect square
-  // uint32_t root = static_cast<uint32_t>(std::sqrt(vpps));
-  // assert(root * root == vpps && vpps != 0);
-
-  // float fov_deg = 90.0f;
-  // float fov_rad = glm::radians(fov_deg);
-
-  // float scale = tan(fov_rad * 0.5f);
-
-  // float aspect = (float)range.x / (float)range.y;
-  //// Camera basis vectors from view matrix (assumes column-major glm::mat4)
-  // glm::vec3 forward = -glm::normalize(glm::vec3(cam.view[2])); // -Z
-  // glm::vec3 right = glm::normalize(glm::vec3(cam.view[0]));    // +X
-  // glm::vec3 up = glm::normalize(glm::vec3(cam.view[1]));       // +Y
-
   // for (uint32_t i = 0; i < range.x * range.y; i++) {
   //   uint32_t c_major = i % range.x;
   //   uint32_t r_major = i / range.x;
+  //   float x_major = upper_left.x + (float)c_major * stride_major;
+  //   float y_major = upper_left.y - (float)r_major * stride_major;
 
   //  for (uint32_t j = 0; j < vpps; j++) {
   //    uint32_t c_minor = j % root;
   //    uint32_t r_minor = j / root;
 
-  //    // Normalized device coordinates in [0, 1]
-  //    float x_ndc = (float(c_major) + (float(c_minor) + 0.5f) / root) /
-  //    range.x; float y_ndc = (float(r_major) + (float(r_minor) + 0.5f) / root)
-  //    / range.y;
+  //    float x_base =
+  //        x_major + (float)c_minor * stride_minor + stride_minor / 2.f;
+  //    float y_base =
+  //        y_major - (float)r_minor * stride_minor - stride_minor / 2.f;
 
-  //    // Map to [-1, 1] with correct aspect ratio
-  //    float x = (x_ndc - 0.5f) * aspect;
-  //    float y = (0.5f - y_ndc);
+  //    float jitter_x = (dist(gen) - 0.5f) * stride_minor;
+  //    float jitter_y = (dist(gen) - 0.5f) * stride_minor;
 
-  //    // Optional jitter
-  //    float jitter_x = (dist(gen) - 0.5f) / range.x;
-  //    float jitter_y = (dist(gen) - 0.5f) / range.y;
+  //    glm::vec4 viewport_hit =
+  //        glm::vec4(x_base + jitter_x, y_base + jitter_y, 0, 1.f);
 
-  //    x += jitter_x * aspect;
-  //    y += jitter_y;
-
-  //    glm::vec3 direction = glm::normalize(forward + x * right*scale + y *
-  //    up*scale);
-
-  //    uint32_t index = i * vpps + j;
-  //    pHitData[index].hit = cam.pos;
-  //    pHitData[index].wo = glm::vec4(direction, 0.f);
-  //    pHitData[index].normal = glm::vec4(0.0f, 0.0f, -1.0f, 0.0f);
-  //    pHitData[index].throughput_depth = glm::vec4(1.0f, 1.0f, 1.0f, 0.0f);
+  //    pHitData[i * vpps + j].hit = cam.pos;
+  //    pHitData[i * vpps + j].wo = glm::normalize(cam.invView*viewport_hit -
+  //    cam.invView*cam.pos); pHitData[i * vpps + j].normal = glm::vec4(0.0f,
+  //    0.0f, -1.0f, 0.0f); pHitData[i * vpps + j].throughput_depth =
+  //        glm::vec4(1.0f, 1.0f, 1.0f, 0.0f);
   //  }
   //}
+  
+  float fov_rad = glm::radians(60.f);
+  float aspect = float(range.x) / float(range.y);
+  float tanHalfFov = tan(fov_rad * 0.5f);
+  float vp_dist = (float(range.x) * 0.5f) / tanHalfFov;
+  glm::vec3 camPos = glm::vec3(cam.pos);
+  glm::mat4 invView = cam.invView;
 
+  // For each “major” pixel row/col:
+  for (uint32_t majorIdx = 0; majorIdx < range.x * range.y; ++majorIdx) {
+    uint32_t cx = majorIdx % range.x;
+    uint32_t ry = majorIdx / range.x;
+
+    // now subdivide:
+    for (uint32_t j = 0; j < vpps; ++j) {
+      uint32_t sx = j % root;
+      uint32_t sy = j / root;
+
+      // Compute a sub‐pixel sample in [0..1]x[0..1] inside this pixel:
+      float u = (float(cx) + (float(sx) + 0.5f + (dist(gen) - 0.5f)) / root) /
+                float(range.x);
+      float v = (float(ry) + (float(sy) + 0.5f + (dist(gen) - 0.5f)) / root) /
+                float(range.y);
+
+      // Convert to NDC [-1..1], flipping Y so that v=0 is bottom:
+      float ndc_x = u * 2.0f - 1.0f;
+      float ndc_y = 1.0f - (v * 2.0f);
+
+      // Ray in camera space on the near plane at z = -vp_dist:
+      glm::vec4 rayCam =
+          glm::vec4(ndc_x * aspect * tanHalfFov * vp_dist,
+                    ndc_y * tanHalfFov * vp_dist, -vp_dist, 1.0f);
+
+      // Unproject into world space:
+      glm::vec3 worldPt = glm::vec3(invView * rayCam);
+      glm::vec3 rayDir = glm::normalize(worldPt - camPos);
+
+      // Store
+      auto &out = pHitData[majorIdx * vpps + j];
+      out.hit = glm::vec4(camPos, 1.0f);
+      out.wo = glm::vec4(rayDir, 0.0f);
+      out.normal = glm::vec4(0, 0, 0, 0);
+      out.throughput_depth = glm::vec4(1, 1, 1, 0);
+    }
+  }
   uploadToVRAM(logicalDevice, cmdPool, queue, allocator, buffer,
                size * sizeof(Tracer::hitData), pHitData.data());
 }

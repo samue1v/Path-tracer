@@ -28,11 +28,10 @@ struct alignas(16) pixelData {
 };
 
 struct alignas(16) Material {
-  // TODO Align this struct better
-
   glm::vec4 albedo_refractiveIdx;
   glm::vec4 emissive_reflectiveIdx;
   glm::vec4 type_pad3;
+  // for spheres, type_pad.y = 1 means half sphere
   
 };
 

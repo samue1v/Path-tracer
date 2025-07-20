@@ -61,7 +61,7 @@ public:
   // Resources for the compute part of the example
   struct Compute {
 
-    static constexpr uint32_t rays_per_pixel = 16*16;
+    static constexpr uint32_t rays_per_pixel = 19 * 19;
     static constexpr uint32_t MAX_OBJECT_SIZE = 20;
 
     vk::Queue queue;
@@ -336,6 +336,13 @@ private:
    * @brief Init IMGUI external lib
    */
   void initIMGUI();
+
+  /**
+   * @brief Updates camera
+   * @params deltaPos glm::vec3 of delta
+   * @params deltaAt glm::vec3 of delta
+   */
+  void updateCamera(glm::vec3 deltaPos, glm::vec3 deltaAt);
 
 private:
   /**
