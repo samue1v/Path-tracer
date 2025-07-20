@@ -46,6 +46,7 @@ set(ENGINE_SOURCES
    engine/ResourceImage.cpp
    engine/Buffer.hpp
    engine/Buffer.cpp
+   engine/scene.cpp
   )
 
 set(PIPELINE_SOURCES

@@ -31,6 +31,8 @@
 #include "pipeline.hpp"
 #include <vk_mem_alloc.h>
 
+#include <map>
+
 #define ENGINE_VERSION VK_MAKE_API_VERSION(0, 1, 0, 0)
 class App;
 
@@ -310,6 +312,12 @@ private:
   void initializeScene();
 
   /**
+   * @brief Execute scene at index;
+   * @params sceneIdx Index of scene
+   */
+  void execScene(uint32_t sceneIdx);
+
+  /**
    * @brief Record compute command buffer
    * @param cmdBuffer Target command buffer and storage image to
    * record
@@ -449,6 +457,11 @@ private:
    * @brief Current frame index
    */
   uint32_t currentFrame;
+
+  /**
+   * @brief Map of scenes
+   */
+  std::map<uint32_t, std::function<void()>> sceneMap;
 
   // IMGUI stuff
 private:
