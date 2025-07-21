@@ -19,7 +19,6 @@ struct alignas(16) camera {
 struct alignas(16) hitData {
   glm::vec4 wo;
   glm::vec4 hit;
-  glm::vec4 normal;
   glm::vec4 throughput_depth; // w coordinate is depth
 };
 

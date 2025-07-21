@@ -188,7 +188,6 @@ void MultiJitterOperator::doOperation(vk::Device logicalDevice,
       auto &out = pHitData[majorIdx * vpps + j];
       out.hit = glm::vec4(camPos, 1.0f);
       out.wo = glm::vec4(rayDir, 0.0f);
-      out.normal = glm::vec4(0, 0, 0, 0);
       out.throughput_depth = glm::vec4(1, 1, 1, 0);
     }
   }

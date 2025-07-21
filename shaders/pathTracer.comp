@@ -35,7 +35,6 @@ const float gammaT = 1./2.2;
 struct HitData {
   vec4 wo;
   vec4 hit;
-  vec4 normal;
   vec4 throughput_depth;
 };
 
@@ -335,27 +334,30 @@ bool intersectionTest(in Sphere sphere, out vec3 hit_p, out vec3 hit_normal, out
 }
 
 vec3 fillHitData(in Plane plane,in vec3 hit,inout HitData hd, inout PRNG32 rng){
-	hd.normal.xyz = normalize(cross(plane.edge1.xyz,plane.edge2.xyz));
-	vec3 n = hd.normal.xyz;
+	//hd.normal.xyz = normalize(cross(plane.edge1.xyz,plane.edge2.xyz));
+	vec3 n = normalize(cross(plane.edge1.xyz,plane.edge2.xyz));//hd.normal.xyz;
 	vec3 result = vec3(0.);
 
 	Sample wi_pdf;
 	if(plane.mat.type_pad3.x == albedo_mat){
-		wi_pdf = sampleDiffuse(hd.normal.xyz,rng);
+		//wi_pdf = sampleDiffuse(hd.normal.xyz,rng);
+		wi_pdf = sampleDiffuse(n,rng);
 		hd.wo = vec4(wi_pdf.dir,0.0);
     	result =  plane.mat.albedo_refractiveIdx.xyz;
 	}
 	else if(plane.mat.type_pad3.x == reflective_mat){
-		wi_pdf = sampleReflective(hd.wo.xyz,hd.normal.xyz);
+		//wi_pdf = sampleReflective(hd.wo.xyz,hd.normal.xyz);
+		wi_pdf = sampleReflective(hd.wo.xyz,n);
 		hd.wo = vec4(wi_pdf.dir,0.0);
-		float cosTheta = max(dot(hd.normal.xyz, wi_pdf.dir), 0.0);
+		//float cosTheta = max(dot(hd.normal.xyz, wi_pdf.dir), 0.0);
+		float cosTheta = max(dot(n, wi_pdf.dir), 0.0);
 		result = fresnelSchlick(cosTheta, vec3(plane.mat.emissive_reflectiveIdx.w));
 	}
 	else if(plane.mat.type_pad3.x == refractive_mat){
 		vec3 original_wo = hd.wo.xyz;
 
 		n = dot(original_wo, n) < 0.0 ? n : -n;
-		hd.normal.xyz = n;
+		//hd.normal.xyz = n;
 
 		float cosThetaI = max(dot(n, -original_wo), 0.0);
 		Fresnel F = fresnelSchlick(original_wo, n, plane.mat.albedo_refractiveIdx.xyz,plane.mat.albedo_refractiveIdx.w);
@@ -377,19 +379,22 @@ vec3 fillHitData(in Plane plane,in vec3 hit,inout HitData hd, inout PRNG32 rng){
 
 vec3 fillHitData(in Sphere sphere, in vec3 hit_p, inout HitData hd, inout PRNG32 rng) {
 	// TODO Sphere refract
-    hd.normal.xyz = normalize(hit_p - sphere.center_radius.xyz);
-	vec3 n = hd.normal.xyz;
+    //hd.normal.xyz = normalize(hit_p - sphere.center_radius.xyz);
+	vec3 n = normalize(hit_p - sphere.center_radius.xyz);//hd.normal.xyz;
 	vec3 result = vec3(0.);
 	Sample wi_pdf;
 	if(sphere.mat.type_pad3.x == albedo_mat){
-		wi_pdf = sampleDiffuse(hd.normal.xyz,rng);
+		//wi_pdf = sampleDiffuse(hd.normal.xyz,rng);
+		wi_pdf = sampleDiffuse(n,rng);
 		hd.wo = vec4(wi_pdf.dir,0.0);
     	result = sphere.mat.albedo_refractiveIdx.xyz;
 	}
 	else if(sphere.mat.type_pad3.x == reflective_mat){
-		wi_pdf = sampleReflective(hd.wo.xyz,hd.normal.xyz);
+		//wi_pdf = sampleReflective(hd.wo.xyz,hd.normal.xyz);
+		wi_pdf = sampleReflective(hd.wo.xyz,n);
 		hd.wo = vec4(wi_pdf.dir,0.0);
-		float cosTheta = max(dot(hd.normal.xyz, wi_pdf.dir), 0.0);
+		//float cosTheta = max(dot(hd.normal.xyz, wi_pdf.dir), 0.0);
+		float cosTheta = max(dot(n, wi_pdf.dir), 0.0);
 		result =  fresnelSchlick(cosTheta, vec3(sphere.mat.emissive_reflectiveIdx.w));
 	}
 
@@ -400,7 +405,7 @@ vec3 fillHitData(in Sphere sphere, in vec3 hit_p, inout HitData hd, inout PRNG32
 			n = -n;
 			eta = 1.0/eta;
 		}
-		hd.normal.xyz = n;
+		//hd.normal.xyz = n;
 
 		float cosThetaI = max(dot(n, -original_wo), 0.0);
 		Fresnel F = fresnelSchlick(original_wo, n, sphere.mat.albedo_refractiveIdx.xyz,eta);
