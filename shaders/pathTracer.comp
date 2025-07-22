@@ -307,7 +307,8 @@ bool intersectionTest(in Sphere sphere, out vec3 hit_p, out vec3 hit_normal, out
     float sqrtDisc = sqrt(discriminant);
     float t0 = (-b - sqrtDisc) / (2.0 * a);
     float t1 = (-b + sqrtDisc) / (2.0 * a);
-
+	
+	bool invert = false;
 	if(!isDome){
     	t = (t0 > 0.0) ? t0 : t1;
     	if (t < 0.0)
@@ -316,6 +317,7 @@ bool intersectionTest(in Sphere sphere, out vec3 hit_p, out vec3 hit_normal, out
 	}
 	else{
 		float rd_dot_focus = dot(rayDir,focus_dir);
+		invert = sphere.mat.type_pad3.x == reflective_mat && rd_dot_focus > 0 ? true : false;
 		float t_candidate = (rd_dot_focus >= 0) ? t1 : t0;
 		if(t_candidate < 0.0){
 			return false;
@@ -329,7 +331,7 @@ bool intersectionTest(in Sphere sphere, out vec3 hit_p, out vec3 hit_normal, out
 	}
 
     hit_p = rayOrigin + t * rayDir;
-	hit_normal = normalize(hit_p - sphere.center_radius.xyz);
+	hit_normal = invert == false ? normalize(hit_p - sphere.center_radius.xyz) : normalize(sphere.center_radius.xyz-hit_p);
     return true;
 }
 
@@ -533,7 +535,7 @@ void main() {
 		float p = max(hit_throughput.r, max(hit_throughput.g, hit_throughput.b));
 		p = clamp(p, 0.1, 1.0);
 		float rr = random(rng);
-		if(uint(mat.type_pad3.x) == albedo_mat){	
+		if(uint(mat.type_pad3.x) == albedo_mat || uint(mat.type_pad3.x) == reflective_mat || uint(mat.type_pad3.x) == refractive_mat){	
 			if(rr>p){
 
 				currentPixelData.radiance_currentRay.xyz += currentHitData.throughput_depth.xyz*mat.albedo_refractiveIdx.xyz*InvRPP;

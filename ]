@@ -77,7 +77,7 @@ void VulkanRender::initializeScene() {
 
     this->compute.spheres.push_back(
         {glm::vec4(-0.35f, -0.15f, -0.8f, 0.125f) * scale,
-         {{0.4f, 0.4f, 0.4f, 1.f}, {0., 0., 0., 1.}, {1.0, .0, .0, .0}}});
+         {{0.4f, 0.4f, 0.4f, 1.f}, {0., 0., 0., 0.2}, {1.0, .0, .0, .0}}});
 
     this->compute.spheres.push_back(
         {glm::vec4(0.f, 0.f, -0.9f, 0.25f / 2.f) * scale,
@@ -85,7 +85,7 @@ void VulkanRender::initializeScene() {
 
     this->compute.spheres.push_back(
         {glm::vec4(-0.2f, -0.3f, -0.3f, 0.4f / 2.f) * scale,
-         {{0.9f, 0.9f, 0.9f, 0.66f},
+         {{0.4f, 0.4f, 0.4f, 0.66f},
           {0., 0., 0., 0.2},
           {2.0, -1.f, -1.f, 0.f}}});
 
@@ -105,7 +105,7 @@ void VulkanRender::initializeScene() {
         glm::vec4(0.f, -0.56f, 0.f, 1.f / scale) * scale,
         glm::vec4(1.f, 0.f, 0.f, 0.f),
         glm::vec4(0.f, 0.f, -1.f, 0.f),
-        glm::vec4(2.f + overlap, 2.f + overlap, 0.f, 0.f) * scale,
+        glm::vec4(1.f + overlap, 1.f + overlap, 0.f, 0.f) * scale,
         {{0.47f, 0.47f, 0.47f, 1.0f},
          {0.6f, 0.6f, 0.6f, 1.0},
          {0., 0., 0., 0.}},
@@ -117,44 +117,41 @@ void VulkanRender::initializeScene() {
          glm::vec4(1.f, 0.f, 0.f, 0.f),
          glm::vec4(0.f, 0.f, 1.f, 0.f),
          glm::vec4(1.f + overlap, 1.f + overlap, 0.f, 0.f) * scale,
-         {{0.f, 0.f, 0.f, 1.0f}, {0., 0., 0., 0.}, {0.0, 0., 0., 0.}}});
+         {{0.6f, 0.6f, 0.6f, 1.0f}, {0., 0., 0., 0.}, {0.0, 0., 0., 0.}}});
 
     // Back wall
-        float angle0 = glm::radians(-45.);
-    glm::mat4 rot0 =
-        glm::rotate(glm::mat4(1.0f), angle0, glm::vec3(0.f, 1.f, 0.f));
     this->compute.planes.push_back(
-        {glm::vec4(-0.5f, -0.36f, -0.8f, 1.f / scale) * scale,
-         rot0*glm::vec4(0.f, 1.f, 0.f, 0.f),
-         rot0*glm::vec4(0.f, 0.f, 1.f, 0.f),
-         glm::vec4(1.f + overlap, 0.8f + overlap, 0.f, 0.f) * scale,
-         {{0.f, 0.f, 0.f, 1.0f}, {1., 1., 1., 1.}, {1.0, 0., 0., 0.}}});
+        {glm::vec4(0.f, 0.06f, -0.5f, 1.f / scale) * scale,
+         glm::vec4(1.f, 0.f, 0.f, 0.f),
+         glm::vec4(0.f, 1.f, 0.f, 0.f),
+         glm::vec4(1.f + overlap, 1.f + overlap, 0.f, 0.f) * scale,
+         {{0.6f, 0.6f, 0.6f, 1.0f}, {0., 0., 0., 0.}, {0.0, 0., 0., 0.}}});
 
-    //Left wall
-    //this->compute.planes.push_back(
-    //    {glm::vec4(-0.5f, -0.06f, 0.f, 1.f / scale) * scale,
-    //     glm::vec4(0.f, 0.f, 1.f, 0.f),
-    //     glm::vec4(0.f, -1.f, 0.f, 0.f),
-    //     glm::vec4(2.f + overlap, 2.f + overlap, 0.f, 0.f) * scale,
-    //     {{0.6f, 0.6f, 0.6f, 1.0f},
-    //      {0., 0., 0., 0.},
-    //      {0.0, .0, .0, .0}}});
+    // Left wall
+    this->compute.planes.push_back(
+        {glm::vec4(-0.5f, -0.06f, 0.f, 1.f / scale) * scale,
+         glm::vec4(0.f, 0.f, 1.f, 0.f),
+         glm::vec4(0.f, -1.f, 0.f, 0.f),
+         glm::vec4(1.f + overlap, 1.f + overlap, 0.f, 0.f) * scale,
+         {{0.14453125, 0.3359375, 0.9296875, 1.0f},
+          {0., 0., 0., 0.},
+          {0.0, .0, .0, .0}}});
 
-    //// Right wall
+    // Right wall
     this->compute.planes.push_back(
         {glm::vec4(0.5f, -0.06f, 0.f, 1.f / scale) * scale,
          glm::vec4(0.f, 0.f, 1.f, 0.f),
          glm::vec4(0.f, 1.f, 0.f, 0.f),
-         glm::vec4(2.f + overlap, 2.f + overlap, 0.f, 0.f) * scale,
-         {{0.6f, 0.6f, 0.6f, 1.0f}, {0., 0., 0., .3}, {0.0, .0, .0, .0}}});
+         glm::vec4(1.f + overlap, 1.f + overlap, 0.f, 0.f) * scale,
+         {{0.1f, 0.4f, 0.f, 1.0f}, {0., 0., 0., .3}, {0.0, .0, .0, .0}}});
 
-    //// Front wall
-    //this->compute.planes.push_back(
-    //    {glm::vec4(0.f, -0.06f, 0.5f, 1.f / scale) * scale,
-    //     glm::vec4(1.f, 0.f, 0.f, 0.f),
-    //     glm::vec4(0.f, -1.f, 0.f, 0.f),
-    //     glm::vec4(1.f + overlap, 1.f + overlap, 0.f, 0.f) * scale,
-    //     {{0.6f, 0.6f, 0.6f, 1.0f}, {0., 0., 0., 0.}, {0.0, .0, .0, .0}}});
+    // Front wall
+    this->compute.planes.push_back(
+        {glm::vec4(0.f, -0.06f, 1.f, 1.f / scale) * scale,
+         glm::vec4(1.f, 0.f, 0.f, 0.f),
+         glm::vec4(0.f, -1.f, 0.f, 0.f),
+         glm::vec4(1.f + overlap, 1.f + overlap, 0.f, 0.f) * scale,
+         {{0.6f, 0.6f, 0.6f, 1.0f}, {0., 0., 0., 0.}, {0.0, .0, .0, .0}}});
 
 
     float angle = glm::radians(45.);
@@ -166,31 +163,25 @@ void VulkanRender::initializeScene() {
          rot*glm::vec4(1.f, 0.f, 0.f, 0.f),
          rot*glm::vec4(0.f, 1.f, 0.f, 0.f),
          glm::vec4(0.3f, 0.3f, 0.f, 0.f) * scale,
-         {{1.f, 1.f, 1.f, 1.0f}, {10.f, 10.f, 10.f, 0.0f}, {4.0, .0, .0, .0}}});
-
-    //this->compute.spheres.push_back(
-    //    {glm::vec4(0.f, -0.56f, -0.5f, 0.5f) * scale,
-    //     {{0.4f, 0.4f, 0.4f, 0.75f},
-    //      {1., 1., 1., 0.5},
-    //      {1.0, 0.f, -1.f, 0.f}}});
+         {{0.f, 0.f, 1.f, 1.0f}, {0.f, 0.f, 10.f, 0.0f}, {4.0, .0, .0, .0}}});
 
     this->compute.spheres.push_back(
         {glm::vec4(0.f, -0.35f, -0.3f, 0.4f / 2.f) * scale,
-         {{0.f, 0.f, 1.f, 1.f},
-          {0., 0., 0., .4},
+         {{0.4f, 0.4f, 0.4f, 0.75f},
+          {0., 0., 0., 0.2},
           {2.0, 0.f, -1.f, 0.f}}});
 
     this->compute.spheres.push_back(
         {glm::vec4(0.120817f, -0.383496f, -0.29f, 0.05f / 2.f) * scale,
-         {{0.7f, 0.7f, 0.7f, 0.66f}, {0., 0., 0.7f, 0.}, {2.0, 0.f, 0.f, 0.f}}});
+         {{0.f, 0.f, 0.7f, 0.66f}, {0., 0., 0.7f, 0.}, {2.0, 0.f, 0.f, 0.f}}});
 
     this->compute.spheres.push_back(
         {glm::vec4(-0.11f, -0.38f, -0.31f, 0.05f / 2.f) * scale,
-         {{0.7f, 0.7f, 0.7f, 0.66f}, {0., 0., 0.7f, 0.}, {2.0, 0.f, 0.f, 0.f}}});
+         {{0.f, 0.f, 0.7f, 0.66f}, {0., 0., 0.7f, 0.}, {2.0, 0.f, 0.f, 0.f}}});
 
     this->compute.spheres.push_back(
         {glm::vec4(-0.083441f, -0.405164f, -0.357282f, 0.05f / 2.f) * scale,
-         {{0.7f, 0.7f, 0.7f, 0.66f}, {0., 0., 0.7f, 0.}, {1.0, 0.f, 0.f, 0.f}}});
+         {{0.f, 0.f, 0.7f, 0.66f}, {0., 0., 0.7f, 0.}, {1.0, 0.f, 0.f, 0.f}}});
 
     this->compute.spheres.push_back(
         {glm::vec4(0.035886f, -0.432239f, -0.331584f, 0.05f / 2.f) * scale,
@@ -198,15 +189,15 @@ void VulkanRender::initializeScene() {
 
     this->compute.spheres.push_back(
         {glm::vec4(0.081815f, -0.388619f, -0.207217, 0.05f / 2.f) * scale,
-         {{0.7f, 0.7f, 0.7f, 0.66f}, {0., 0., 0.7f, 0.}, {1.0, 0.f, 0.f, 0.f}}});
+         {{0.f, 0.f, 0.7f, 0.66f}, {0., 0., 0.7f, 0.}, {1.0, 0.f, 0.f, 0.f}}});
 
     this->compute.spheres.push_back(
         {glm::vec4(-0.023792f, -0.427971f, -0.266128f, 0.05f / 2.f) * scale,
-         {{0.7f, 0.7f, 0.7f, 0.66f}, {0., 0., 0.7f, 0.}, {2.0, 0.f, 0.f, 0.f}}});
+         {{0.f, 0.f, 0.7f, 0.66f}, {0., 0., 0.7f, 0.}, {2.0, 0.f, 0.f, 0.f}}});
 
     this->compute.spheres.push_back(
         {glm::vec4(-0.066406f, -0.369171f, -0.217973f, 0.05f / 2.f) * scale,
-         {{0.7f, 0.7f, 0.47f, 0.66f}, {0., 0., 0.7f, 0.}, {1.0, 0.f, 0.f, 0.f}}});
+         {{0.f, 0.f, 0.47f, 0.66f}, {0., 0., 0.7f, 0.}, {1.0, 0.f, 0.f, 0.f}}});
   };
 
   // Initialize camera
@@ -293,10 +284,6 @@ void VulkanRender::initializeScene() {
 
   sceneMap[3] = [=, this]() {
     addCamera3();
-    addScene1();
-  };
-  sceneMap[4] = [=, this]() {
-    addCamera1();
     addScene1();
   };
 }
