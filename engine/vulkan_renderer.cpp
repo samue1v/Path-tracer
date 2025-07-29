@@ -39,7 +39,7 @@ void VulkanRender::init() {
 
   initializeScene();
 
-  execScene(0);
+  execScene(1);
 
   createUniformBuffers();
 
