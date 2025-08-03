@@ -36,6 +36,7 @@ struct HitData {
   vec4 wo;
   vec4 hit;
   vec4 throughput_depth;
+  vec4 init_wo;
 };
 
 struct PRNG32 {
@@ -115,10 +116,12 @@ layout(std430, set = 0, binding = 6) buffer PixelDataBuffer{
 };
 
 layout( push_constant ) uniform PushConstants{
+  mat4 m;
   uint rpp;
   uint numSpheres;
   uint numPlanes;
   uint numLights;
+  bool cameraMoved;
 } constants;
 
 // Functions ---------------------------------------------------
@@ -488,15 +491,35 @@ bool Trace(inout HitData hd, inout PRNG32 rng , out Material mat , out vec3 hit_
 	return true;
 }
 
+
+void resetCamera(in uint hd_index, in uint idx ){
+	PixelData pd = pixel_data[idx];
+
+    uint cr = uint(pd.radiance_currentRay.w);
+	uint f = idx*constants.rpp;
+
+	for(uint i = 0; i < constants.rpp ; i++){
+		uint c = f + i;
+		HitData hd =  hit_data[c];
+		hd.wo = constants.m*vec4(hd.init_wo.xyz,0.);
+		hd.hit = constants.m*vec4(camera.pos.xyz,1.0);
+		hd.throughput_depth = vec4(1.,1.,1.,0.);
+
+		hit_data[c] = hd;
+
+	}
+	pd.radiance_currentRay = vec4(0.,0.,0.,0.);
+
+	pixel_data[idx] = pd;
+
+}
+
 // Main --------------------------------------------------------
 
 void main() {
     uvec2 gid = gl_GlobalInvocationID.xy;
     ivec2 imageSize = imageSize(StorageImage);
     uint index = gid.y * imageSize.x + gid.x;
-	if(pixel_data[index].radiance_currentRay.w >= constants.rpp){
-		return;
-	}
 
     uint hd_index = index*constants.rpp +uint( pixel_data[index].radiance_currentRay.w);
 	
@@ -504,6 +527,20 @@ void main() {
 	HitData currentHitData =  hit_data[hd_index];
 	PixelData currentPixelData = pixel_data[index];
     PRNG32 rng = prng32[index];
+
+	if(constants.cameraMoved){
+		resetCamera(hd_index,index);
+
+    	ivec2 pos = ivec2(gid);
+    	imageStore(StorageImage, pos,vec4(0.));
+
+		return;
+
+	}
+
+	if(pixel_data[index].radiance_currentRay.w >= constants.rpp){
+		return;
+	}
 
 	//if(currentHitData.throughput_depth.w == 0){
 	//	currentHitData.wo = camera.invView*currentHitData.wo;
@@ -555,7 +592,7 @@ void main() {
 		}
 	}
 
-
+	
 	// Write Data
     prng32[index] = rng;
 	hit_data[hd_index] = currentHitData;

@@ -20,6 +20,7 @@ struct alignas(16) hitData {
   glm::vec4 wo;
   glm::vec4 hit;
   glm::vec4 throughput_depth; // w coordinate is depth
+  glm::vec4 init_wo;
 };
 
 struct alignas(16) pixelData {
@@ -48,10 +49,12 @@ struct alignas(16) plane {
 };
 
 struct alignas(16) PushConstants {
+  glm::mat4 m;
   uint32_t rpp;
   uint32_t numSpheres;
   uint32_t numPlanes;
   uint32_t numLights;
+  bool camera_move;
 };
 
 }; // namespace Tracer

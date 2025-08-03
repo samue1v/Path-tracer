@@ -39,7 +39,7 @@ void VulkanRender::init() {
 
   initializeScene();
 
-  execScene(1);
+  execScene(0);
 
   createUniformBuffers();
 
@@ -254,134 +254,140 @@ void VulkanRender::createBufferResources() {
                                  allocFlags);
 }
 
-//void VulkanRender::initializeScene() {
+// void VulkanRender::initializeScene() {
 //
-//  const float scale = 640.f;
-//  // Initialize camera
-//  float viewportWidth = (float)chain.extent.width;
-//  float fov_deg = 60.0f;
-//  float fov_rad = glm::radians(fov_deg);
+//   const float scale = 640.f;
+//   // Initialize camera
+//   float viewportWidth = (float)chain.extent.width;
+//   float fov_deg = 60.0f;
+//   float fov_rad = glm::radians(fov_deg);
 //
-//  // Default
-//  // glm::vec3 posDelta(0.);
-//  // glm::vec3 atDelta(0.);
+//   // Default
+//   // glm::vec3 posDelta(0.);
+//   // glm::vec3 atDelta(0.);
 //
-//  // Caustic top right
-//  //glm::vec3 posDelta(0.4f,0.4f,-0.4f);
-//  //glm::vec3 atDelta(-0.2f,-0.7f,-0.2f);
+//   // Caustic top right
+//   //glm::vec3 posDelta(0.4f,0.4f,-0.4f);
+//   //glm::vec3 atDelta(-0.2f,-0.7f,-0.2f);
 //
-//  // Caustic center back
-//  glm::vec3 posDelta(0.f,0.f,0.f);
-//  glm::vec3 atDelta(-0.3f,-0.7f,-0.2f);
+//   // Caustic center back
+//   glm::vec3 posDelta(0.f,0.f,0.f);
+//   glm::vec3 atDelta(-0.3f,-0.7f,-0.2f);
 //
 //
-//  float vp_dist = (viewportWidth * 0.5f) / tan(fov_rad * 0.5f) / scale;
-//  glm::vec3 pos((glm::vec3(0.f, 0.f, vp_dist) + posDelta) * scale);
-//  glm::vec3 foward((glm::vec3(0.f, 0.f, -1.f) + atDelta) * scale);
-//  glm::vec3 up(0.f, 1.f, 0.f);
+//   float vp_dist = (viewportWidth * 0.5f) / tan(fov_rad * 0.5f) / scale;
+//   glm::vec3 pos((glm::vec3(0.f, 0.f, vp_dist) + posDelta) * scale);
+//   glm::vec3 foward((glm::vec3(0.f, 0.f, -1.f) + atDelta) * scale);
+//   glm::vec3 up(0.f, 1.f, 0.f);
 //
-//  compute.cameraUniform.pos = glm::vec4(pos, 1.0f);
-//  compute.cameraUniform.view = glm::lookAt(pos, foward, up);
-//  compute.cameraUniform.invView = glm::inverse(compute.cameraUniform.view);
+//   compute.cameraUniform.pos = glm::vec4(pos, 1.0f);
+//   compute.cameraUniform.view = glm::lookAt(pos, foward, up);
+//   compute.cameraUniform.invView = glm::inverse(compute.cameraUniform.view);
 //
-//  //  float vp_dist = (viewportWidth * 0.5f) / tan(fov_rad * 0.5f) / scale;
-//  //  compute.cameraUniform.pos =
-//  //      glm::vec4(0.4f, 0.4f, (vp_dist - 0.2), 1.0f / scale) * scale;
-//  //  compute.cameraUniform.view =
-//  //  glm::lookAt(glm::vec3(compute.cameraUniform.pos),
-//  //                                           glm::vec3(0.f, -0.7f, -0.3f) *
-//  //                                           scale, glm::vec3(0.f, 1.f, 0.f) *
-//  //                                           scale);
-//  //  compute.cameraUniform.invView = glm::inverse(compute.cameraUniform.view);
+//   //  float vp_dist = (viewportWidth * 0.5f) / tan(fov_rad * 0.5f) / scale;
+//   //  compute.cameraUniform.pos =
+//   //      glm::vec4(0.4f, 0.4f, (vp_dist - 0.2), 1.0f / scale) * scale;
+//   //  compute.cameraUniform.view =
+//   //  glm::lookAt(glm::vec3(compute.cameraUniform.pos),
+//   //                                           glm::vec3(0.f, -0.7f, -0.3f) *
+//   //                                           scale, glm::vec3(0.f, 1.f,
+//   0.f) *
+//   //                                           scale);
+//   //  compute.cameraUniform.invView =
+//   glm::inverse(compute.cameraUniform.view);
 //
-//  const float overlap = 0.001 / scale;
+//   const float overlap = 0.001 / scale;
 //
-//  // Floor
-//  compute.planes.push_back({
-//      glm::vec4(0.f, -0.5f, 0.f, 1.f / scale) * scale,
-//      glm::vec4(1.f, 0.f, 0.f, 0.f),
-//      glm::vec4(0.f, 0.f, -1.f, 0.f),
-//      glm::vec4(1.f + overlap, 2.f + overlap, 0.f, 0.f) * scale,
-//      {{0.47f, 0.17f, 0.10f, 1.0f}, {0.6f, 0.6f, 0.6f, 1.0}, {0., 0., 0., 0.}},
-//  });
-//  // Ceiling
-//  compute.planes.push_back(
-//
-//      {glm::vec4(0.f, 0.5f, 0.f, 1.f / scale) * scale,
+//   // Floor
+//   compute.planes.push_back({
+//       glm::vec4(0.f, -0.5f, 0.f, 1.f / scale) * scale,
 //       glm::vec4(1.f, 0.f, 0.f, 0.f),
-//       glm::vec4(0.f, 0.f, 1.f, 0.f),
+//       glm::vec4(0.f, 0.f, -1.f, 0.f),
 //       glm::vec4(1.f + overlap, 2.f + overlap, 0.f, 0.f) * scale,
-//       {{0.6f, 0.6f, 0.6f, 1.0f}, {0., 0., 0., 0.}, {0.0, 0., 0., 0.}}});
+//       {{0.47f, 0.17f, 0.10f, 1.0f}, {0.6f, 0.6f, 0.6f, 1.0}, {0., 0., 0.,
+//       0.}},
+//   });
+//   // Ceiling
+//   compute.planes.push_back(
 //
-//  // Back wall
-//  compute.planes.push_back(
-//      {glm::vec4(0.f, 0.f, -1.f, 1.f / scale) * scale,
-//       glm::vec4(1.f, 0.f, 0.f, 0.f),
-//       glm::vec4(0.f, 1.f, 0.f, 0.f),
-//       glm::vec4(1.f + overlap, 1.f + overlap, 0.f, 0.f) * scale,
-//       {{0.6f, 0.6f, 0.6f, 1.0f}, {0., 0., 0., 0.}, {0.0, 0., 0., 0.}}});
+//       {glm::vec4(0.f, 0.5f, 0.f, 1.f / scale) * scale,
+//        glm::vec4(1.f, 0.f, 0.f, 0.f),
+//        glm::vec4(0.f, 0.f, 1.f, 0.f),
+//        glm::vec4(1.f + overlap, 2.f + overlap, 0.f, 0.f) * scale,
+//        {{0.6f, 0.6f, 0.6f, 1.0f}, {0., 0., 0., 0.}, {0.0, 0., 0., 0.}}});
 //
-//  // Left wall
-//  compute.planes.push_back(
-//      {glm::vec4(-0.5f, 0.f, 0.f, 1.f / scale) * scale,
-//       glm::vec4(0.f, 0.f, 1.f, 0.f),
-//       glm::vec4(0.f, -1.f, 0.f, 0.f),
-//       glm::vec4(1280.f + overlap, 640.f + overlap, 0.f, 0.f) * scale,
-//       {{0.14453125, 0.3359375, 0.9296875, 1.0f},
-//        {0., 0., 0., 0.},
-//        {0.0, .0, .0, .0}}});
+//   // Back wall
+//   compute.planes.push_back(
+//       {glm::vec4(0.f, 0.f, -1.f, 1.f / scale) * scale,
+//        glm::vec4(1.f, 0.f, 0.f, 0.f),
+//        glm::vec4(0.f, 1.f, 0.f, 0.f),
+//        glm::vec4(1.f + overlap, 1.f + overlap, 0.f, 0.f) * scale,
+//        {{0.6f, 0.6f, 0.6f, 1.0f}, {0., 0., 0., 0.}, {0.0, 0., 0., 0.}}});
 //
-//  // Right wall
-//  compute.planes.push_back(
-//      {glm::vec4(0.5f, 0.f, 0.f, 1.f / scale) * scale,
-//       glm::vec4(0.f, 0.f, 1.f, 0.f),
-//       glm::vec4(0.f, 1.f, 0.f, 0.f),
-//       glm::vec4(2.f + overlap, 1.f + overlap, 0.f, 0.f) * scale,
-//       {{0.1f, 0.4f, 0.f, 1.0f}, {0., 0., 0., .3}, {0.0, .0, .0, .0}}});
+//   // Left wall
+//   compute.planes.push_back(
+//       {glm::vec4(-0.5f, 0.f, 0.f, 1.f / scale) * scale,
+//        glm::vec4(0.f, 0.f, 1.f, 0.f),
+//        glm::vec4(0.f, -1.f, 0.f, 0.f),
+//        glm::vec4(1280.f + overlap, 640.f + overlap, 0.f, 0.f) * scale,
+//        {{0.14453125, 0.3359375, 0.9296875, 1.0f},
+//         {0., 0., 0., 0.},
+//         {0.0, .0, .0, .0}}});
 //
-//  // Front wall
-//  compute.planes.push_back(
-//      {glm::vec4(0.f, 0.f, 1.f, 1.f / scale) * scale,
-//       glm::vec4(1.f, 0.f, 0.f, 0.f),
-//       glm::vec4(0.f, -1.f, 0.f, 0.f),
-//       glm::vec4(1.f + overlap, 1.f + overlap, 0.f, 0.f) * scale,
-//       {{0.6f, 0.6f, 0.6f, 1.0f}, {0., 0., 0., 0.}, {0.0, .0, .0, .0}}});
+//   // Right wall
+//   compute.planes.push_back(
+//       {glm::vec4(0.5f, 0.f, 0.f, 1.f / scale) * scale,
+//        glm::vec4(0.f, 0.f, 1.f, 0.f),
+//        glm::vec4(0.f, 1.f, 0.f, 0.f),
+//        glm::vec4(2.f + overlap, 1.f + overlap, 0.f, 0.f) * scale,
+//        {{0.1f, 0.4f, 0.f, 1.0f}, {0., 0., 0., .3}, {0.0, .0, .0, .0}}});
 //
-//  compute.spheres.push_back(
-//      {glm::vec4(-0.35f, -0.15f, -0.8f, 0.125f) * scale,
-//       {{0.4f, 0.4f, 0.4f, 1.f}, {0., 0., 0., 0.2}, {1.0, .0, .0, .0}}});
+//   // Front wall
+//   compute.planes.push_back(
+//       {glm::vec4(0.f, 0.f, 1.f, 1.f / scale) * scale,
+//        glm::vec4(1.f, 0.f, 0.f, 0.f),
+//        glm::vec4(0.f, -1.f, 0.f, 0.f),
+//        glm::vec4(1.f + overlap, 1.f + overlap, 0.f, 0.f) * scale,
+//        {{0.6f, 0.6f, 0.6f, 1.0f}, {0., 0., 0., 0.}, {0.0, .0, .0, .0}}});
 //
-//  float angle = glm::radians(45.);
-//  glm::mat4 rot = glm::rotate(glm::mat4(1.0f), angle, glm::vec3(1.f, 0.f, 0.f));
-//  // Refract plane test
-//  // compute.planes.push_back(
-//  //     {glm::vec4(0.f, 0.f, -280.f, 1.f),
-//  //      rot*glm::vec4(1.f, 0.f, 0.f, 0.f),
-//  //      rot*glm::vec4(0.f, 1.f, 0.f, 0.f),
-//  //      glm::vec4(100.f + overlap, 100.f + overlap, 0.f, 0.f),
-//  //      {{0.6f, 0.6f, 0.6f, 1.f}, {0., 0., 0., 0.}, {2.0, .0, .0, .0}}});
+//   compute.spheres.push_back(
+//       {glm::vec4(-0.35f, -0.15f, -0.8f, 0.125f) * scale,
+//        {{0.4f, 0.4f, 0.4f, 1.f}, {0., 0., 0., 0.2}, {1.0, .0, .0, .0}}});
 //
-//  // compute.spheres.push_back(
-//  //     {glm::vec4(0.f, -0.1f, -0.3f, 0.125f/2.f)*scale,
-//  //      {{0.4f, 0.4f, 0.4f, 0.66f}, {0., 0., 0., 0.2}, {2.0, 0.f,
-//  //      0.f, 1.f}}});
+//   float angle = glm::radians(45.);
+//   glm::mat4 rot = glm::rotate(glm::mat4(1.0f), angle, glm::vec3(1.f, 0.f,
+//   0.f));
+//   // Refract plane test
+//   // compute.planes.push_back(
+//   //     {glm::vec4(0.f, 0.f, -280.f, 1.f),
+//   //      rot*glm::vec4(1.f, 0.f, 0.f, 0.f),
+//   //      rot*glm::vec4(0.f, 1.f, 0.f, 0.f),
+//   //      glm::vec4(100.f + overlap, 100.f + overlap, 0.f, 0.f),
+//   //      {{0.6f, 0.6f, 0.6f, 1.f}, {0., 0., 0., 0.}, {2.0, .0, .0, .0}}});
 //
-//  compute.spheres.push_back(
-//      {glm::vec4(0.f, 0.f, -0.9f, 0.25f / 2.f) * scale,
-//       {{0.0f, 0.8f, 0.8f, 1.0f}, {0., 0., 0., 0.}, {0.0, .0, .0, .0}}});
+//   // compute.spheres.push_back(
+//   //     {glm::vec4(0.f, -0.1f, -0.3f, 0.125f/2.f)*scale,
+//   //      {{0.4f, 0.4f, 0.4f, 0.66f}, {0., 0., 0., 0.2}, {2.0, 0.f,
+//   //      0.f, 1.f}}});
 //
-//  compute.spheres.push_back(
-//      {glm::vec4(-0.2f, -0.3f, -0.3f, 0.4f / 2.f) * scale,
-//       {{0.4f, 0.4f, 0.4f, 0.66f}, {0., 0., 0., 0.2}, {2.0, -1.f, -1.f, 0.f}}});
+//   compute.spheres.push_back(
+//       {glm::vec4(0.f, 0.f, -0.9f, 0.25f / 2.f) * scale,
+//        {{0.0f, 0.8f, 0.8f, 1.0f}, {0., 0., 0., 0.}, {0.0, .0, .0, .0}}});
 //
-//  // Plane light(luz do teto)
-//  compute.planes.push_back(
-//      {glm::vec4(0.f, 0.49f, 0.f, 1.f / scale) * scale,
-//       glm::vec4(1.f, 0.f, 0.f, 0.f),
-//       glm::vec4(0.f, 0.f, 1.f, 0.f),
-//       glm::vec4(0.5f, 1.f, 0.f, 0.f) * scale,
-//       {{1.f, 1.f, 1.f, 1.0f}, {10.f, 10.f, 10.f, 0.0f}, {4.0, .0, .0, .0}}});
-//}
+//   compute.spheres.push_back(
+//       {glm::vec4(-0.2f, -0.3f, -0.3f, 0.4f / 2.f) * scale,
+//        {{0.4f, 0.4f, 0.4f, 0.66f}, {0., 0., 0., 0.2}, {2.0, -1.f, -1.f,
+//        0.f}}});
+//
+//   // Plane light(luz do teto)
+//   compute.planes.push_back(
+//       {glm::vec4(0.f, 0.49f, 0.f, 1.f / scale) * scale,
+//        glm::vec4(1.f, 0.f, 0.f, 0.f),
+//        glm::vec4(0.f, 0.f, 1.f, 0.f),
+//        glm::vec4(0.5f, 1.f, 0.f, 0.f) * scale,
+//        {{1.f, 1.f, 1.f, 1.0f}, {10.f, 10.f, 10.f, 0.0f}, {4.0, .0, .0,
+//        .0}}});
+// }
 
 void VulkanRender::initializeBuffers() {
 
@@ -426,6 +432,11 @@ void VulkanRender::updateShaderData(vk::CommandBuffer cmdBuffer) {
   compute.constants.numSpheres = compute.spheres.size();
   compute.constants.numLights = 0;
   compute.constants.rpp = compute.rays_per_pixel;
+  compute.constants.camera_move = *cameraMoved;
+
+ int ri = readIndex->load(std::memory_order_relaxed);
+ compute.constants.m =(*buffer_camera).at(ri).invView;
+
 
   cmdBuffer.pushConstants(compute.pipeline.layout,
                           vk::ShaderStageFlagBits::eCompute, 0,
@@ -433,8 +444,10 @@ void VulkanRender::updateShaderData(vk::CommandBuffer cmdBuffer) {
 }
 
 void VulkanRender::drawFrame() {
+
   logicalDevice.waitForFences(1, &inFlightFences[currentFrame], vk::True,
                               UINT64_MAX);
+
   auto resImg = logicalDevice.acquireNextImageKHR(
       chain.chain, UINT64_MAX, imageAvailableSemaphores[currentFrame], nullptr);
   if (resImg.result == vk::Result::eErrorOutOfDateKHR) {
@@ -461,7 +474,13 @@ void VulkanRender::drawFrame() {
     //                 std::to_string(compute.currentComputeBuffer));
     logicalDevice.resetFences(1, &compute.computeFence);
     swapComputePresentImages();
+    if (*cameraMoved) {
+      Logger::log(Logger::LogLevel::DEBUG, "Camera moved need reset");
+      compute.constants.camera_move =
+          (*cameraMoved).load(std::memory_order_acquire);
+    }
     recordComputeCommandBuffer(compute.commandBuffer);
+
 
     vk::PipelineStageFlags waitStageCompute =
         vk::PipelineStageFlagBits::eTransfer;
@@ -476,6 +495,9 @@ void VulkanRender::drawFrame() {
     submitInfo.pWaitDstStageMask = &waitStageCompute;
 
     compute.queue.submit(1, &submitInfo, compute.computeFence);
+
+
+
     if (enableValidationLayers) {
       auto now = std::chrono::system_clock::now();
 
@@ -488,6 +510,7 @@ void VulkanRender::drawFrame() {
 
       // Logger::log(Logger::LogLevel::DEBUG, "Compute done at: " + oss.str());
     }
+
     // logicalDevice.waitForFences(1,&compute.computeFence,1, UINT64_MAX);
   }
 
@@ -528,6 +551,7 @@ void VulkanRender::drawFrame() {
   presentInfo.pResults = nullptr;
 
   auto resPres = graphics.queue.presentKHR(&presentInfo);
+  (*cameraMoved).store(0, std::memory_order_relaxed);
 
   if (resPres == vk::Result::eErrorOutOfDateKHR ||
       resPres == vk::Result::eSuboptimalKHR || frameBufferResized) {
@@ -1304,8 +1328,8 @@ void VulkanRender::buildRenderPass() {
   vk::AttachmentDescription colorAttachment{};
   colorAttachment.format = chain.format.format;
   colorAttachment.samples = vk::SampleCountFlagBits::e1;
-  colorAttachment.loadOp = vk::AttachmentLoadOp::eLoad;
-  colorAttachment.storeOp = vk::AttachmentStoreOp::eStore;
+  colorAttachment.loadOp = vk::AttachmentLoadOp::eNone;
+  colorAttachment.storeOp = vk::AttachmentStoreOp::eNone;
   colorAttachment.stencilLoadOp = vk::AttachmentLoadOp::eDontCare;
   colorAttachment.stencilStoreOp = vk::AttachmentStoreOp::eDontCare;
   colorAttachment.initialLayout = vk::ImageLayout::ePresentSrcKHR;

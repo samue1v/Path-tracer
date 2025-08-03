@@ -31,6 +31,7 @@
 #include "pipeline.hpp"
 #include <vk_mem_alloc.h>
 
+#include <atomic>
 #include <map>
 
 #define ENGINE_VERSION VK_MAKE_API_VERSION(0, 1, 0, 0)
@@ -63,7 +64,7 @@ public:
   // Resources for the compute part of the example
   struct Compute {
 
-    static constexpr uint32_t rays_per_pixel = 16*16;//21 * 21;
+    static constexpr uint32_t rays_per_pixel = 16*16; // 21 * 21;
     static constexpr uint32_t MAX_OBJECT_SIZE = 20;
 
     vk::Queue queue;
@@ -96,7 +97,6 @@ public:
     vk::Fence computeFence;
     vk::Semaphore computeFinishedSemaphore; // Framesinflight = 3
     vk::Semaphore acquireSemaphore, releaseSemaphore;
-    bool cameraMoved = false;
 
   } compute;
   /**
@@ -475,6 +475,11 @@ private:
 
   // Shared stuff
 public:
+  std::atomic<int> *readIndex;
+  std::atomic<int> *writeIndex;
+  std::atomic<bool>*cameraMoved;
+  std::array<Tracer::camera, 2> *buffer_camera;
+
   App *app;
 };
 
