@@ -10,7 +10,7 @@ GLFW_backend::GLFW_backend() {
   glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
   glfwWindowHint(GLFW_FLOATING, GLFW_TRUE);
   glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
-  window = glfwCreateWindow(416,416, "Vulkan", nullptr, nullptr);
+  window = glfwCreateWindow(512,512, "Vulkan", nullptr, nullptr);
   int w,h;
   glfwGetWindowSize(window, &w, &h);
   Logger::log(Logger::LogLevel::INFO, "Window Size: " + std::to_string(w) + " x " + std::to_string(h));

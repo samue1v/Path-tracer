@@ -82,7 +82,7 @@ void App::main_loop() {
   glfwSetCursorPosCallback(window, cursor_position_callback);
   glfwSetKeyCallback(window, key_callback);
   auto last_time = std::chrono::high_resolution_clock::now();
-  const int target_update = 400;
+  const int target_update = 60;
   const long opt_time = target_update > 0 ? 1'000'000'000 / target_update : 0;
   long last_update_time = 0;
 

@@ -12,9 +12,9 @@
 #include <glm/vec4.hpp>
 #include <array>
 
-static float speed = 20.f;
-static float xsens = .05f;
-static float ysens = .05f;
+static float speed = 10.f;
+static float xsens = .03f;
+static float ysens = .03f;
 
 class Camera {
 public:

@@ -9,7 +9,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 VulkanRender::VulkanRender(GLFWwindow *window, const char *appName)
-    : window(window), appName(appName), framesInFlight(3), currentFrame(0),
+    : window(window), appName(appName), framesInFlight(1), currentFrame(0),
       frameBufferResized(0) {}
 
 void VulkanRender::init() {
@@ -434,9 +434,8 @@ void VulkanRender::updateShaderData(vk::CommandBuffer cmdBuffer) {
   compute.constants.rpp = compute.rays_per_pixel;
   compute.constants.camera_move = *cameraMoved;
 
- int ri = readIndex->load(std::memory_order_relaxed);
- compute.constants.m =(*buffer_camera).at(ri).invView;
-
+  int ri = readIndex->load(std::memory_order_relaxed);
+  compute.constants.m = (*buffer_camera).at(ri).invView;
 
   cmdBuffer.pushConstants(compute.pipeline.layout,
                           vk::ShaderStageFlagBits::eCompute, 0,
@@ -450,12 +449,12 @@ void VulkanRender::drawFrame() {
 
   auto resImg = logicalDevice.acquireNextImageKHR(
       chain.chain, UINT64_MAX, imageAvailableSemaphores[currentFrame], nullptr);
-  if (resImg.result == vk::Result::eErrorOutOfDateKHR) {
-    throw std::runtime_error("Unable to recreateSwapChain");
-  } else if (resImg.result != vk::Result::eSuccess &&
-             resImg.result != vk::Result::eSuboptimalKHR) {
-    throw std::runtime_error("Failed to acquire swap chain image.");
-  }
+  // if (resImg.result == vk::Result::eErrorOutOfDateKHR) {
+  //   throw std::runtime_error("Unable to recreateSwapChain");
+  // } else if (resImg.result != vk::Result::eSuccess &&
+  //            resImg.result != vk::Result::eSuboptimalKHR) {
+  //   throw std::runtime_error("Failed to acquire swap chain image.");
+  // }
 
   logicalDevice.resetFences(1, &inFlightFences[currentFrame]);
   uint32_t imageIdx = resImg.value;
@@ -481,7 +480,6 @@ void VulkanRender::drawFrame() {
     }
     recordComputeCommandBuffer(compute.commandBuffer);
 
-
     vk::PipelineStageFlags waitStageCompute =
         vk::PipelineStageFlagBits::eTransfer;
     vk::SubmitInfo submitInfo{};
@@ -495,8 +493,6 @@ void VulkanRender::drawFrame() {
     submitInfo.pWaitDstStageMask = &waitStageCompute;
 
     compute.queue.submit(1, &submitInfo, compute.computeFence);
-
-
 
     if (enableValidationLayers) {
       auto now = std::chrono::system_clock::now();
@@ -534,9 +530,7 @@ void VulkanRender::drawFrame() {
 
   auto resSubmit =
       graphics.queue.submit(1, &submitInfo, inFlightFences[currentFrame]);
-  if (resSubmit != vk::Result::eSuccess) {
-    throw std::runtime_error("Failed to submit draw command buffer");
-  }
+  assert(resSubmit != vk::Result::eSuccess);
 
   vk::PresentInfoKHR presentInfo{};
   presentInfo.sType = vk::StructureType::ePresentInfoKHR;
@@ -553,18 +547,18 @@ void VulkanRender::drawFrame() {
   auto resPres = graphics.queue.presentKHR(&presentInfo);
   (*cameraMoved).store(0, std::memory_order_relaxed);
 
-  if (resPres == vk::Result::eErrorOutOfDateKHR ||
-      resPres == vk::Result::eSuboptimalKHR || frameBufferResized) {
-    throw std::runtime_error("Window resized error.");
-  } else if (resPres != vk::Result::eSuccess &&
-             resPres != vk::Result::eSuboptimalKHR) {
-    throw std::runtime_error("Failed to present swap chain image.");
-  }
+  // if (resPres == vk::Result::eErrorOutOfDateKHR ||
+  //     resPres == vk::Result::eSuboptimalKHR || frameBufferResized) {
+  //   throw std::runtime_error("Window resized error.");
+  // } else if (resPres != vk::Result::eSuccess &&
+  //            resPres != vk::Result::eSuboptimalKHR) {
+  //   throw std::runtime_error("Failed to present swap chain image.");
+  // }
   currentFrame = (currentFrame + 1) % framesInFlight;
 }
 
 void VulkanRender::swapComputePresentImages() {
-
+  logicalDevice.waitForFences(graphics.copyFinishFence, 1, UINT64_MAX);
   compute.acquireBuffer.reset();
   compute.releaseBuffer.reset();
   graphics.acquireBuffer.reset();
@@ -731,7 +725,6 @@ void VulkanRender::swapComputePresentImages() {
 
   logicalDevice.resetFences(1, &graphics.copyFinishFence);
   compute.queue.submit(acquireCompBufferSubmitInfo, graphics.copyFinishFence);
-  logicalDevice.waitForFences(graphics.copyFinishFence, 1, UINT64_MAX);
 }
 
 void VulkanRender::recordComputeCommandBuffer(vk::CommandBuffer cmdBuffer) {
@@ -1642,6 +1635,7 @@ void VulkanRender::createSyncObjects() {
 
   vk::FenceCreateInfo fenceCopyInfo{};
   fenceCopyInfo.sType = vk::StructureType::eFenceCreateInfo;
+  fenceCopyInfo.flags = vk::FenceCreateFlagBits::eSignaled;
 
   auto semCompFin = logicalDevice.createSemaphore(semaphoreInfoCompute);
   auto semGraphAcquire = logicalDevice.createSemaphore(semaphoreInfoCompute);

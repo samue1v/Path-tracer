@@ -192,7 +192,8 @@ mat3 buildTangentBasis(in vec3 normal) {
 
 vec3 fresnelSchlick(float cosTheta, vec3 F0) {
     //return F0 + (1.0 - F0) * pow(1.0 - cosTheta, 5.0);
-    return F0 + (1.0 - F0) * (1.0 - cosTheta)*(1.0 - cosTheta)*(1.0 - cosTheta)*(1.0 - cosTheta)*(1.0 - cosTheta);
+	float comp = 1.0 - cosTheta;
+    return F0 + (1.0 - F0) * (comp)*(comp)*(comp)*(comp)*(comp);
 }
 
 
@@ -204,7 +205,8 @@ Fresnel fresnelSchlick(in vec3 wo,in vec3 normal, in vec3 F0, in float eta){
 		cosTheta = eta <= 1.0 ? max(0.0,dot(-wo, normal)) : max(0.0,dot(r,-normal));
 		f.TIR = false;
 		f.wi = r;
-		f.throughput = F0 + (1.0 - F0) * (1.0 - cosTheta)*(1.0 - cosTheta)*(1.0 - cosTheta)*(1.0 - cosTheta)*(1.0 - cosTheta);
+		float comp = 1.0 - cosTheta;
+		f.throughput = F0 + (1.0 - F0) * (comp)*(comp)*(comp)*(comp)*(comp);
 	}
 	else{
 		// TIR
@@ -340,7 +342,8 @@ bool intersectionTest(in Sphere sphere, out vec3 hit_p, out vec3 hit_normal, out
 
 vec3 fillHitData(in Plane plane,in vec3 hit,inout HitData hd, inout PRNG32 rng){
 	//hd.normal.xyz = normalize(cross(plane.edge1.xyz,plane.edge2.xyz));
-	vec3 n = normalize(cross(plane.edge1.xyz,plane.edge2.xyz));//hd.normal.xyz;
+	//vec3 n = normalize(cross(plane.edge1.xyz,plane.edge2.xyz));//hd.normal.xyz;
+	vec3 n = cross(plane.edge1.xyz,plane.edge2.xyz);// Assuming vectors already normalized
 	vec3 result = vec3(0.);
 
 	Sample wi_pdf;
@@ -443,13 +446,13 @@ bool Trace(inout HitData hd, inout PRNG32 rng , out Material mat , out vec3 hit_
 	vec3 nearestHitP;
 	const uint max_iterations = max(constants.numSpheres,constants.numPlanes);
 	for(uint i = 0; i < max_iterations;++i){
+		float hit_t;
+		vec3 hit_p;
+		vec3 hit_normal;
 		if(i < constants.numPlanes){
-			float hit_t;
-			vec3 hit_p;
-			vec3 hit_normal;
 			bool does_hit= intersectionTest(planes[i],hit_p,hit_normal,hit_t,hd);
-		if(does_hit && hit_t < nearestT){
-			nearestT = hit_t;
+			if(does_hit && hit_t < nearestT){
+				nearestT = hit_t;
 				nearestIndex = i;
 				nearestShape = plane_shape;
 				nearestNormal = hit_normal;
@@ -457,9 +460,6 @@ bool Trace(inout HitData hd, inout PRNG32 rng , out Material mat , out vec3 hit_
 			}
 		}
 		if(i < constants.numSpheres){
-            float hit_t;
-            vec3 hit_p;
-			vec3 hit_normal;
             bool does_hit= intersectionTest(spheres[i],hit_p,hit_normal,hit_t,hd);
             if(does_hit && hit_t < nearestT){
                 nearestT = hit_t;
@@ -494,8 +494,6 @@ bool Trace(inout HitData hd, inout PRNG32 rng , out Material mat , out vec3 hit_
 
 void resetCamera(in uint hd_index, in uint idx ){
 	PixelData pd = pixel_data[idx];
-
-    uint cr = uint(pd.radiance_currentRay.w);
 	uint f = idx*constants.rpp;
 
 	for(uint i = 0; i < constants.rpp ; i++){
@@ -509,7 +507,6 @@ void resetCamera(in uint hd_index, in uint idx ){
 
 	}
 	pd.radiance_currentRay = vec4(0.,0.,0.,0.);
-
 	pixel_data[idx] = pd;
 
 }
@@ -530,12 +527,7 @@ void main() {
 
 	if(constants.cameraMoved){
 		resetCamera(hd_index,index);
-
-    	ivec2 pos = ivec2(gid);
-    	imageStore(StorageImage, pos,vec4(0.));
-
 		return;
-
 	}
 
 	if(pixel_data[index].radiance_currentRay.w >= constants.rpp){
@@ -551,9 +543,9 @@ void main() {
 
 	// Trace scene
 	Material mat;
-	mat.albedo_refractiveIdx = vec4(1.,1.,1.,0.);
-	mat.emissive_reflectiveIdx = vec4(0.,0.,0.,0.);
-	mat.type_pad3 = vec4(0.,0.,0.,0.);
+	//mat.albedo_refractiveIdx = vec4(1.,1.,1.,0.);
+	//mat.emissive_reflectiveIdx = vec4(0.,0.,0.,0.);
+	//mat.type_pad3 = vec4(0.,0.,0.,0.);
 	vec3 hit_throughput = vec3(1.,1.,1.);
     bool hitSomething = Trace(currentHitData, rng, mat , hit_throughput);
 
