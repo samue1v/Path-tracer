@@ -94,7 +94,7 @@ layout(std430, set = 0, binding = 1) buffer HitDataBuffer {
     HitData hit_data[];
 };
 
-layout(rgba8, binding = 2) uniform writeonly image2D StorageImage;
+layout(rgba8, binding = 2) uniform image2D StorageImage;
 
 layout(std430, set = 0, binding = 3) buffer RNGBuffer{
     PRNG32 prng32[];
@@ -590,9 +590,32 @@ void main() {
 	hit_data[hd_index] = currentHitData;
 	pixel_data[index] = currentPixelData;
 
-	// Store image
     ivec2 pos = ivec2(gid);
-	color = vec4(gammaCorrect(currentPixelData.radiance_currentRay.xyz),0.0);
+
+	// Store image
+    color = vec4(gammaCorrect(currentPixelData.radiance_currentRay.xyz),0.0);
+    imageStore(StorageImage, pos,color);
+
+
+	// Apply filter
+	vec4 sum = vec4(0.);//vec4(currentPixelData.radiance_currentRay.xyz,0.0);
+    float count = 0;
+
+    // Loop over 3x3 neighborhood
+    for (int dy = -1; dy <= 1; dy++) {
+        for (int dx = -1; dx <= 1; dx++) {
+            ivec2 coord = clamp(pos + ivec2(dx, dy), ivec2(0), imageSize - ivec2(1));
+            vec4 l =  imageLoad(StorageImage, coord);
+				sum+=l;
+            	count++;
+        }
+    }
+
+    vec4 avg = sum / count;
+
+	// Store image
+	//color = vec4(gammaCorrect(currentPixelData.radiance_currentRay.xyz),0.0);
+	color = vec4(avg.xyz,0.0);
     imageStore(StorageImage, pos,color);
 
 }
