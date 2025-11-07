@@ -64,7 +64,8 @@ public:
   // Resources for the compute part of the example
   struct Compute {
 
-    static constexpr uint32_t rays_per_pixel = 10*10; // 21 * 21;
+    static constexpr uint32_t MAX_RAYS_PER_PIXEL = 15*15;
+    uint32_t  rays_per_pixel = MAX_RAYS_PER_PIXEL; // 21 * 21;
     static constexpr uint32_t MAX_OBJECT_SIZE = 20;
 
     vk::Queue queue;

@@ -30,6 +30,11 @@ const uint refractive_mat = 0x2u;
 const uint emissive_mat   = 0x4u;
 
 const float gammaT = 1./2.2;
+
+const int  KERNEL_SIZE = 3;
+const float SPATIAL_SIGMA = 2.0;
+const float RANGE_SIGMA = 0.5;
+
 // CPU Struct definition -------------------------------------------
 
 struct HitData {
@@ -118,9 +123,13 @@ layout(std430, set = 0, binding = 6) buffer PixelDataBuffer{
 layout( push_constant ) uniform PushConstants{
   mat4 m;
   uint rpp;
+  uint max_rpp;
   uint numSpheres;
   uint numPlanes;
   uint numLights;
+  uint pad0;
+  uint pad1;
+  uint pad2;
   bool cameraMoved;
 } constants;
 
@@ -494,9 +503,9 @@ bool Trace(inout HitData hd, inout PRNG32 rng , out Material mat , out vec3 hit_
 
 void resetCamera(in uint hd_index, in uint idx ){
 	PixelData pd = pixel_data[idx];
-	uint f = idx*constants.rpp;
+	uint f = idx*constants.max_rpp;
 
-	for(uint i = 0; i < constants.rpp ; i++){
+	for(uint i = 0; i < constants.max_rpp ; i++){
 		uint c = f + i;
 		HitData hd =  hit_data[c];
 		hd.wo = constants.m*vec4(hd.init_wo.xyz,0.);
@@ -511,6 +520,15 @@ void resetCamera(in uint hd_index, in uint idx ){
 
 }
 
+float gaussian(float x, float sigma) {
+    float alpha = -1.0 / (2.0 * sigma * sigma);
+    return exp(x * x * alpha);
+}
+
+float luminance(vec3 color) {
+    return dot(color, vec3(0.2126, 0.7152, 0.0722));
+}
+
 // Main --------------------------------------------------------
 
 void main() {
@@ -518,7 +536,7 @@ void main() {
     ivec2 imageSize = imageSize(StorageImage);
     uint index = gid.y * imageSize.x + gid.x;
 
-    uint hd_index = index*constants.rpp +uint( pixel_data[index].radiance_currentRay.w);
+    uint hd_index = index*constants.max_rpp +uint( pixel_data[index].radiance_currentRay.w);
 	
 	// Acquired Data
 	HitData currentHitData =  hit_data[hd_index];
@@ -598,24 +616,38 @@ void main() {
 
 
 	// Apply filter
-	vec4 sum = vec4(0.);//vec4(currentPixelData.radiance_currentRay.xyz,0.0);
-    float count = 0;
+	vec3 centerColor = color.xyz;
+	float centerLum = luminance(centerColor);
+    
+    vec3 sum = vec3(0.0);
+    float totalWeight = 0.0;
+    int halfSize = KERNEL_SIZE / 2;
 
-    // Loop over 3x3 neighborhood
-    for (int dy = -1; dy <= 1; dy++) {
-        for (int dx = -1; dx <= 1; dx++) {
+    for (int dy = -halfSize; dy <= halfSize; dy++) {
+        for (int dx = -halfSize; dx <= halfSize; dx++) {
             ivec2 coord = clamp(pos + ivec2(dx, dy), ivec2(0), imageSize - ivec2(1));
-            vec4 l =  imageLoad(StorageImage, coord);
-				sum+=l;
-            	count++;
+            
+            vec3 sampleColor = imageLoad(StorageImage, coord).rgb;
+            float sampleLum = luminance(sampleColor);
+            
+            // Spatial distance weight
+            float dist = length(vec2(dx, dy));
+            float spatialWeight = gaussian(dist, SPATIAL_SIGMA);
+            
+            // Range (intensity) difference weight
+            float rangeDist = abs(centerLum - sampleLum);
+            float rangeWeight = gaussian(rangeDist, RANGE_SIGMA);
+            
+            float weight = spatialWeight * rangeWeight;
+            sum += sampleColor * weight;
+            totalWeight += weight;
         }
     }
-
-    vec4 avg = sum / count;
+	vec3 filtered = (totalWeight > 0.0) ? sum / totalWeight : centerColor;
 
 	// Store image
 	//color = vec4(gammaCorrect(currentPixelData.radiance_currentRay.xyz),0.0);
-	color = vec4(avg.xyz,0.0);
+	color = vec4(filtered,0.0);
     imageStore(StorageImage, pos,color);
 
 }

@@ -51,9 +51,13 @@ struct alignas(16) plane {
 struct alignas(16) PushConstants {
   glm::mat4 m;
   uint32_t rpp;
+  uint32_t max_rpp;
   uint32_t numSpheres;
   uint32_t numPlanes;
   uint32_t numLights;
+  uint32_t pad0;
+  uint32_t pad1;
+  uint32_t pad2;
   bool camera_move;
 };
 

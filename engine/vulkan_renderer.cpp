@@ -433,6 +433,7 @@ void VulkanRender::updateShaderData(vk::CommandBuffer cmdBuffer) {
   compute.constants.numLights = 0;
   compute.constants.rpp = compute.rays_per_pixel;
   compute.constants.camera_move = *cameraMoved;
+  compute.constants.max_rpp = compute.MAX_RAYS_PER_PIXEL;
 
   int ri = readIndex->load(std::memory_order_relaxed);
   compute.constants.m = (*buffer_camera).at(ri).invView;
@@ -464,7 +465,7 @@ void VulkanRender::drawFrame() {
   ImGui::NewFrame();
 
   showPerformanceMenu();
-  // showMenu();
+  showMenu();
 
   if (logicalDevice.getFenceStatus(compute.computeFence) ==
       vk::Result::eSuccess) {
@@ -1903,49 +1904,13 @@ void VulkanRender::showPerformanceMenu() {
 void VulkanRender::updateCamera(glm::vec3 posDelta, glm::vec3 atDelta) {}
 
 void VulkanRender::showMenu() {
-  static glm::vec3 pos;
-  static glm::vec3 at;
+  static int rpp_menu;
   ImGui::SetNextWindowSize(ImVec2(0, 0), ImGuiCond_Always);
-  ImGui::Begin("Position Menu", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
-  //  ImGui::InputFloat("Pos X", &xyz_pos.x);
-  //  ImGui::InputFloat("Pos Y", &xyz_pos.y);
-  //  ImGui::InputFloat("Pos Z", &xyz_pos.z);
-  //
-  //  ImGui::InputFloat("At X", &xyz_at.x);
-  //  ImGui::InputFloat("At Y", &xyz_at.y);
-  //  ImGui::InputFloat("At Z", &xyz_at.z);
-  //
-
-  float fullWidth = ImGui::GetContentRegionAvail().x;
-  float spacing = ImGui::GetStyle().ItemSpacing.x;
-  float inputWidth = (fullWidth - spacing * 2) / 3.0f;
-
-  ImGui::Text("Pos:");
-  ImGui::SameLine();
-  ImGui::PushItemWidth(inputWidth);
-  for (int i = 0; i < 3; ++i) {
-    ImGui::PushID(i);
-    ImGui::InputFloat("", &pos[i], 0, 0, "%.3f");
-    ImGui::PopID();
-    if (i < 2)
-      ImGui::SameLine();
-  }
-  ImGui::PopItemWidth();
-
-  ImGui::Text("At :");
-  ImGui::SameLine();
-  ImGui::PushItemWidth(inputWidth);
-  for (int i = 0; i < 3; ++i) {
-    ImGui::PushID(i + 100);
-    ImGui::InputFloat("", &at[i], 0, 0, "%.3f");
-    ImGui::PopID();
-    if (i < 2)
-      ImGui::SameLine();
-  }
-  ImGui::PopItemWidth();
+  ImGui::Begin("Menu", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
+  ImGui::InputInt("RPP:", &rpp_menu);
 
   if (ImGui::Button("OK")) {
-    updateCamera(pos, at);
+    compute.rays_per_pixel = rpp_menu*rpp_menu;
   }
   ImGui::End();
 }

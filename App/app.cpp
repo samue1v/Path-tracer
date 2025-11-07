@@ -119,17 +119,16 @@ void App::processInput() {}
 void App::key_callback(GLFWwindow *window, int key, int scancode, int action,
                        int mods) {
   App *app = static_cast<App *>(glfwGetWindowUserPointer(window));
-  if (key == GLFW_KEY_W && action == GLFW_PRESS) {
-    app->camera.walkFront();
-  } else if (key == GLFW_KEY_S && action == GLFW_PRESS) {
-    app->camera.walkBack();
-  }else if (key == GLFW_KEY_A && action == GLFW_PRESS) {
-    app->camera.walkLeft();
-  }else if (key == GLFW_KEY_D && action == GLFW_PRESS) {
-    app->camera.walkRight();
+  if ((action == GLFW_PRESS) || (action == GLFW_REPEAT)) {
+    if (key == GLFW_KEY_W)
+      app->camera.walkFront();
+    else if (key == GLFW_KEY_S)
+      app->camera.walkBack();
+    else if (key == GLFW_KEY_A)
+      app->camera.walkLeft();
+    else if (key == GLFW_KEY_D)
+      app->camera.walkRight();
   }
-
-
 }
 
 void App::mouse_button_callback(GLFWwindow *window, int button, int action,

@@ -32,48 +32,48 @@ void VulkanRender::initializeScene() {
          {0.6f, 0.6f, 0.6f, 1.0},
          {0., 0., 0., 0.}},
     });
-    // Ceiling
-    this->compute.planes.push_back(
+    //// Ceiling
+    //this->compute.planes.push_back(
 
-        {glm::vec4(0.f, 0.5f, 0.f, 1.f / scale) * scale,
-         glm::vec4(1.f, 0.f, 0.f, 0.f),
-         glm::vec4(0.f, 0.f, 1.f, 0.f),
-         glm::vec4(1.f + overlap, 2.f + overlap, 0.f, 0.f) * scale,
-         {{0.6f, 0.6f, 0.6f, 1.0f}, {0., 0., 0., 0.}, {0.0, 0., 0., 0.}}});
+    //    {glm::vec4(0.f, 0.5f, 0.f, 1.f / scale) * scale,
+    //     glm::vec4(1.f, 0.f, 0.f, 0.f),
+    //     glm::vec4(0.f, 0.f, 1.f, 0.f),
+    //     glm::vec4(1.f + overlap, 2.f + overlap, 0.f, 0.f) * scale,
+    //     {{0.6f, 0.6f, 0.6f, 1.0f}, {0., 0., 0., 0.}, {0.0, 0., 0., 0.}}});
 
-    // Back wall
-    this->compute.planes.push_back(
-        {glm::vec4(0.f, 0.f, -1.f, 1.f / scale) * scale,
-         glm::vec4(1.f, 0.f, 0.f, 0.f),
-         glm::vec4(0.f, 1.f, 0.f, 0.f),
-         glm::vec4(1.f + overlap, 1.f + overlap, 0.f, 0.f) * scale,
-         {{0.6f, 0.6f, 0.6f, 1.0f}, {0., 0., 0., 0.}, {0.0, 0., 0., 0.}}});
+    //// Back wall
+    //this->compute.planes.push_back(
+    //    {glm::vec4(0.f, 0.f, -1.f, 1.f / scale) * scale,
+    //     glm::vec4(1.f, 0.f, 0.f, 0.f),
+    //     glm::vec4(0.f, 1.f, 0.f, 0.f),
+    //     glm::vec4(1.f + overlap, 1.f + overlap, 0.f, 0.f) * scale,
+    //     {{0.6f, 0.6f, 0.6f, 1.0f}, {0., 0., 0., 0.}, {0.0, 0., 0., 0.}}});
 
-    // Left wall
-    this->compute.planes.push_back(
-        {glm::vec4(-0.5f, 0.f, 0.f, 1.f / scale) * scale,
-         glm::vec4(0.f, 0.f, 1.f, 0.f),
-         glm::vec4(0.f, -1.f, 0.f, 0.f),
-         glm::vec4(2.f + overlap, 1.f + overlap, 0.f, 0.f) * scale,
-         {{0.14453125, 0.3359375, 0.9296875, 1.0f},
-          {0., 0., 0., 0.},
-          {0.0, .0, .0, .0}}});
+    //// Left wall
+    //this->compute.planes.push_back(
+    //    {glm::vec4(-0.5f, 0.f, 0.f, 1.f / scale) * scale,
+    //     glm::vec4(0.f, 0.f, 1.f, 0.f),
+    //     glm::vec4(0.f, -1.f, 0.f, 0.f),
+    //     glm::vec4(2.f + overlap, 1.f + overlap, 0.f, 0.f) * scale,
+    //     {{0.14453125, 0.3359375, 0.9296875, 1.0f},
+    //      {0., 0., 0., 0.},
+    //      {0.0, .0, .0, .0}}});
 
-    // Right wall
-    this->compute.planes.push_back(
-        {glm::vec4(0.5f, 0.f, 0.f, 1.f / scale) * scale,
-         glm::vec4(0.f, 0.f, 1.f, 0.f),
-         glm::vec4(0.f, 1.f, 0.f, 0.f),
-         glm::vec4(2.f + overlap, 1.f + overlap, 0.f, 0.f) * scale,
-         {{0.1f, 0.4f, 0.f, 1.0f}, {0., 0., 0., .3}, {0.0, .0, .0, .0}}});
+    //// Right wall
+    //this->compute.planes.push_back(
+    //    {glm::vec4(0.5f, 0.f, 0.f, 1.f / scale) * scale,
+    //     glm::vec4(0.f, 0.f, 1.f, 0.f),
+    //     glm::vec4(0.f, 1.f, 0.f, 0.f),
+    //     glm::vec4(2.f + overlap, 1.f + overlap, 0.f, 0.f) * scale,
+    //     {{0.1f, 0.4f, 0.f, 1.0f}, {0., 0., 0., .3}, {0.0, .0, .0, .0}}});
 
-    // Front wall
-    this->compute.planes.push_back(
-        {glm::vec4(0.f, 0.f, 1.f, 1.f / scale) * scale,
-         glm::vec4(1.f, 0.f, 0.f, 0.f),
-         glm::vec4(0.f, -1.f, 0.f, 0.f),
-         glm::vec4(1.f + overlap, 1.f + overlap, 0.f, 0.f) * scale,
-         {{0.6f, 0.6f, 0.6f, 1.0f}, {0., 0., 0., 0.}, {0.0, .0, .0, .0}}});
+    //// Front wall
+    //this->compute.planes.push_back(
+    //    {glm::vec4(0.f, 0.f, 1.f, 1.f / scale) * scale,
+    //     glm::vec4(1.f, 0.f, 0.f, 0.f),
+    //     glm::vec4(0.f, -1.f, 0.f, 0.f),
+    //     glm::vec4(1.f + overlap, 1.f + overlap, 0.f, 0.f) * scale,
+    //     {{0.6f, 0.6f, 0.6f, 1.0f}, {0., 0., 0., 0.}, {0.0, .0, .0, .0}}});
 
     this->compute.spheres.push_back(
         {glm::vec4(-0.35f, -0.15f, -0.8f, 0.125f) * scale,
