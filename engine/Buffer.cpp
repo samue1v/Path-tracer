@@ -2,13 +2,13 @@
 #include "Logger.hpp"
 
 void Buffer::create(vk::Device _device, VmaAllocator _allocator,
-                    vk::BufferCreateInfo bufferInfo,
+                    vk::BufferCreateInfo bufferInfo, VmaMemoryUsage usage,
                     VkMemoryPropertyFlags allocFlags) {
   device = _device;
   allocator = _allocator;
 
   VmaAllocationCreateInfo allocInfo = {};
-  allocInfo.usage = VMA_MEMORY_USAGE_AUTO;
+  allocInfo.usage = usage;
   allocInfo.requiredFlags = allocFlags;
 
   const VkBufferCreateInfo *bufferInfoC =

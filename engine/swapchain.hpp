@@ -2,8 +2,8 @@
 #define SWAPCHAIN_HPP
 #define VULKAN_HPP_NO_EXCEPTIONS
 #include "../config/config.hpp"
-#include "frame.hpp"
 #include "Logger.hpp"
+#include "frame.hpp"
 #include <deque>
 #include <functional>
 #include <vulkan/vulkan.hpp>
@@ -18,28 +18,28 @@ public:
    * @param surface the window surface to present to
    * @param width requested swapchain width
    * @param height requested swapchain height
+   * @param familyIndices specify queue family to be used
    */
   void create(vk::Device logicalDevice, vk::PhysicalDevice physicalDevice,
-              vk::SurfaceKHR surface, uint32_t width, uint32_t height);
+              vk::SurfaceKHR surface, uint32_t width, uint32_t height, const std::vector<uint32_t> & familyIndices);
 
   /**
    * @brief Populates the new swapchain
    */
-  void build(vk::RenderPass renderPass);
+  void build(vk::RenderPass renderPass = VK_NULL_HANDLE);
 
-/**
- * @brief Transition layout from undefined to present
- * @param img Image to be transitioned
- *
- * details Might become obsolete after a image superclass creation
- */
+  /**
+   * @brief Transition layout from undefined to present
+   * @param img Image to be transitioned
+   *
+   * details Might become obsolete after a image superclass creation
+   */
   void adjustLayout(vk::Image img);
 
   /**
    * @brief Create frameBuffers
    */
   void createFrameBuffers(vk::RenderPass renderPass);
-
 
   /**
    * @brief Cleans the swap chain for recreation
@@ -76,7 +76,6 @@ public:
    */
   std::vector<Frame> frames;
 
-
   /**
    * @brief Frame buffer vector
    */
@@ -86,7 +85,6 @@ public:
    * @brief Logical Device
    */
   vk::Device logicalDevice;
-  
 
 private:
   /**

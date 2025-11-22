@@ -40,7 +40,8 @@ void ResourceImage::createImage(vk::Device device, VmaAllocator memAllocator,
   assert(res == VK_SUCCESS);
   Logger::log(
       Logger::LogLevel::DEBUG,
-      {"Storage image allocated.", "Size: " + std::to_string(allocInfo.size)});
+      {"Storage image allocated.", "Size: " + std::to_string(allocInfo.size),
+       "Storage Image addr: " + std::format("0x{:x}", (uint64_t)image_)});
 }
 
 void ResourceImage::transitionLayout(

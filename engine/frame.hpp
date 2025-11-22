@@ -40,6 +40,11 @@ public:
    * @brief Image format
    */
   vk::Format format;
+
+  /**
+   * @brief Image Layout
+   */
+  vk::ImageLayout layout;
 };
 
 #endif

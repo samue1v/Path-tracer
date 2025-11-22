@@ -7,6 +7,7 @@ set(CMAKE_CXX_STANDARD 20)
 #set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g -O0 -Wall -Wextra")
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+set(CMAKE_CXX_FLAGS_DEBUG  "-g")
 
 list(APPEND CMAKE_PREFIX_PATH "/usr/local/lib")
 #find_package(Vulkan REQUIRED PATHS "/usr/local" NO_DEFAULT_PATH)

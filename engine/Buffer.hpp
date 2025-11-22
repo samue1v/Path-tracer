@@ -7,8 +7,8 @@ class Buffer {
 public:
   Buffer() = default;
   void create(vk::Device device, VmaAllocator allocator,
-              vk::BufferCreateInfo bufferInfo,
-               VkMemoryPropertyFlags allocFlags);
+              vk::BufferCreateInfo bufferInfo, VmaMemoryUsage usage,
+              VkMemoryPropertyFlags allocFlags);
   void cleanUp();
 
 public:

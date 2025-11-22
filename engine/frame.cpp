@@ -2,7 +2,7 @@
 
 Frame::Frame(vk::Image image, vk::Device logicalDevice,
              vk::Format swapchainFormat)
-  : image(image), format(swapchainFormat){
+  : image(image), format(swapchainFormat), layout(vk::ImageLayout::eUndefined){
 
     createImageView(logicalDevice);
 

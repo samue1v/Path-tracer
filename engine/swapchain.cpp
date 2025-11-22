@@ -2,8 +2,8 @@
 
 void Swapchain::create(vk::Device logicalDevice,
                        vk::PhysicalDevice physicalDevice,
-                       vk::SurfaceKHR surface, uint32_t width,
-                       uint32_t height) {
+                       vk::SurfaceKHR surface, uint32_t width, uint32_t height,
+                       const std::vector<uint32_t> &familyIndices) {
   this->logicalDevice = logicalDevice;
 
   vk::SurfaceCapabilitiesKHR capabilities =
@@ -18,7 +18,6 @@ void Swapchain::create(vk::Device logicalDevice,
   format = chooseSurfaceFormat(formats);
 
   vk::PresentModeKHR presentMode = choosePresentMode(presentModes);
-
 
   extent = chooseExtent(width, height, capabilities);
 
@@ -51,6 +50,7 @@ void Swapchain::create(vk::Device logicalDevice,
   clipped_      = {}, VULKAN_HPP_NAMESPACE::SwapchainKHR   oldSwapchain_ = {} )
   VULKAN_HPP_NOEXCEPT
   */
+
   vk::SwapchainCreateInfoKHR createInfo = vk::SwapchainCreateInfoKHR(
       vk::SwapchainCreateFlagsKHR(), surface, imageCount, format.format,
       format.colorSpace, extent, 1,
@@ -60,6 +60,9 @@ void Swapchain::create(vk::Device logicalDevice,
   createInfo.preTransform = capabilities.currentTransform;
   createInfo.presentMode = presentMode;
   createInfo.clipped = VK_TRUE;
+  createInfo.imageSharingMode = vk::SharingMode::eExclusive;
+  createInfo.queueFamilyIndexCount = familyIndices.size();
+  createInfo.pQueueFamilyIndices = familyIndices.data();
 
   createInfo.oldSwapchain = vk::SwapchainKHR(nullptr);
 
@@ -79,9 +82,14 @@ void Swapchain::build(vk::RenderPass renderPass) {
 
   for (uint32_t i = 0; i < images.size(); ++i) {
     frames.push_back(Frame(images[i], logicalDevice, format.format));
+    VkImage raw = static_cast<VkImage>(images[i]);
+    Logger::log(
+        Logger::LogLevel::DEBUG,
+        {"Swapchain Image addr: " + std::format("0x{:x}", (uint64_t)raw)});
   }
-
-  createFrameBuffers(renderPass);
+  if (renderPass != VK_NULL_HANDLE) {
+    createFrameBuffers(renderPass);
+  }
 }
 
 void Swapchain::cleanUp() {
@@ -125,7 +133,8 @@ Swapchain::choosePresentMode(std::vector<vk::PresentModeKHR> presentModes) {
 vk::SurfaceFormatKHR
 Swapchain::chooseSurfaceFormat(std::vector<vk::SurfaceFormatKHR> formats) {
 
-  Logger::log(Logger::LogLevel::DEBUG,"Avaliable formats: " + std::to_string(formats.size()));
+  Logger::log(Logger::LogLevel::DEBUG,
+              "Avaliable formats: " + std::to_string(formats.size()));
   for (vk::SurfaceFormatKHR format : formats) {
     if (enableValidationLayers && chain == vk::SwapchainKHR{}) {
       Logger::log(Logger::LogLevel::DEBUG,

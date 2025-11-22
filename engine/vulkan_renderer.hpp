@@ -45,42 +45,36 @@ public:
   // Resources for the graphics part of the example
   struct Graphics {
 
-    vk::DescriptorSetLayout descriptorSetLayout{VK_NULL_HANDLE};
-    Pipeline pipeline;
-    vk::PipelineLayout pipelineLayout{VK_NULL_HANDLE};
-    vk::Semaphore acquireSemaphore, releaseSemaphore, copySemaphore;
-    vk::Fence copyFinishFence;
     vk::Queue queue{VK_NULL_HANDLE};
     uint32_t queueIDX;
+    uint32_t familyQueueIDX;
+
+    // vk::DescriptorSetLayout descriptorSetLayout{VK_NULL_HANDLE};
+    Pipeline pipeline;
+    vk::PipelineLayout pipelineLayout{VK_NULL_HANDLE};
+    vk::Semaphore renderFinishedSemaphore; //  transitionSemaphore,
     std::vector<vk::CommandBuffer> commandBuffer{};
-    vk::CommandBuffer acquireBuffer, releaseBuffer, copyBuffer;
-
-    ResourceImage displayImg;
-
     vk::CommandPool commandPool{VK_NULL_HANDLE};
+    vk::Sampler sampler{VK_NULL_HANDLE};
 
   } graphics;
 
   // Resources for the compute part of the example
   struct Compute {
 
-    static constexpr uint32_t MAX_RAYS_PER_PIXEL = 15*15;
-    uint32_t  rays_per_pixel = MAX_RAYS_PER_PIXEL; // 21 * 21;
+    static constexpr uint32_t MAX_RAYS_PER_PIXEL = 5 * 5;
+    uint32_t rays_per_pixel = MAX_RAYS_PER_PIXEL; // 21 * 21;
     static constexpr uint32_t MAX_OBJECT_SIZE = 20;
 
     vk::Queue queue;
     uint32_t queueIDX;
+    uint32_t familyQueueIDX;
 
     vk::CommandPool commandPool;
     vk::CommandBuffer commandBuffer;
 
-    vk::DescriptorSetLayout descriptorSetLayout;
-    vk::DescriptorSet descriptorSet;
-    vk::DescriptorPool descriptorPool;
     vk::PushConstantRange pushConstantsRange;
     Pipeline pipeline;
-
-    vk::CommandBuffer acquireBuffer, releaseBuffer;
 
     Buffer uniformBuffer;
     Buffer hitDataBuffer;
@@ -95,11 +89,16 @@ public:
     std::vector<Tracer::sphere> spheres;
     std::vector<Tracer::plane> planes;
 
-    vk::Fence computeFence;
     vk::Semaphore computeFinishedSemaphore; // Framesinflight = 3
-    vk::Semaphore acquireSemaphore, releaseSemaphore;
 
   } compute;
+
+  struct General {
+    vk::DescriptorSetLayout descriptorSetLayout;
+    vk::DescriptorSet descriptorSet;
+    vk::DescriptorPool descriptorPool;
+
+  } general;
   /**
    * @brief Construct new Engine object
    *
@@ -233,10 +232,10 @@ private:
    */
   void createCommandPool();
 
-  /**
+  /**DEPRECATED
    * @brief Builds the render pass
    */
-  void buildRenderPass();
+  // void buildRenderPass();
 
   /**
    * @brief Creates and initializes vma allocator wrapper
@@ -252,6 +251,11 @@ private:
    * @brief Create descriptors sets layouts
    */
   void createDescriptorSetLayout();
+
+  /**
+   * @brief Create samplers
+   */
+  void createSamplers();
 
   /**
    * @brief Create pipeline
@@ -298,9 +302,40 @@ private:
   bool hasStencilComponent(vk::Format format);
 
   /**
-   * @brief Handle the function swap from storage images
+   * @brief Transition image a given layout to a new layout
+   * @params cmd Command buffer
+   * @params image Target image
+   * @params oldLayout Old layout
+   * @params newLayout New layouts
+   * @params aspectMask Mask for image transition
    */
-  void swapComputePresentImages();
+  void transitionImage(vk::CommandBuffer cmd, vk::Image image,
+                       vk::ImageLayout oldLayout, vk::ImageLayout newLayout,
+                       vk::ImageAspectFlags aspectMask);
+
+  /**
+   * @brief Transition image a given layout to a new layout
+   * @params cmd Command buffer
+   * @params image Target resource image
+   * @params oldLayout Old layout
+   * @params newLayout New layouts
+   * @params aspectMask Mask for image transition
+   */
+  void transitionImage(vk::CommandBuffer cmd, ResourceImage &image,
+                       vk::ImageLayout oldLayout, vk::ImageLayout newLayout,
+                       vk::ImageAspectFlags aspectMask);
+
+  /**
+   * @brief Transition image a given layout to a new layout
+   * @params cmd Command buffer
+   * @params frame Target resource frame image
+   * @params oldLayout Old layout
+   * @params newLayout New layouts
+   * @params aspectMask Mask for image transition
+   */
+  void transitionImage(vk::CommandBuffer cmd, Frame &frame,
+                       vk::ImageLayout oldLayout, vk::ImageLayout newLayout,
+                       vk::ImageAspectFlags aspectMask);
 
   /**
    * @brief Initialize buffer data if needed
@@ -387,7 +422,7 @@ private:
   /**
    * @brief Current render pass
    */
-  vk::RenderPass renderPass;
+  // vk::RenderPass renderPass;
 
   /**
    * @brief Semaphore that signals when swapchain image is avaliable
@@ -460,6 +495,11 @@ private:
   uint32_t currentFrame;
 
   /**
+   * @brief Is first frame
+   */
+  bool firstFrame;
+
+  /**
    * @brief Map of scenes
    */
   std::map<uint32_t, std::function<void()>> sceneMap;
@@ -478,7 +518,7 @@ private:
 public:
   std::atomic<int> *readIndex;
   std::atomic<int> *writeIndex;
-  std::atomic<bool>*cameraMoved;
+  std::atomic<bool> *cameraMoved;
   std::array<Tracer::camera, 2> *buffer_camera;
 
   App *app;

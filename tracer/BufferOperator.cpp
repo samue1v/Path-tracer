@@ -28,7 +28,7 @@ void BufferOperator::uploadToVRAM(vk::Device logicalDevice,
 
   void *mapped = nullptr;
   vmaMapMemory(allocator, stagingAllocation, &mapped);
-  std::memcpy(mapped, srcData, static_cast<size_t>(buffer.allocationInfo.size));
+  std::memcpy(mapped, srcData, static_cast<size_t>(size));
   vmaUnmapMemory(allocator, stagingAllocation);
 
   vk::CommandBufferAllocateInfo allocCmdInfo{};
@@ -51,7 +51,7 @@ void BufferOperator::uploadToVRAM(vk::Device logicalDevice,
   copyRegion.dstOffset = 0;
   copyRegion.size = size;
 
-  vk::Buffer stagingBufferWrapper = stagingBuffer;
+  vk::Buffer stagingBufferWrapper(stagingBuffer);
 
   commandBuffer.copyBuffer(stagingBufferWrapper, buffer.buffer, 1, &copyRegion);
 
@@ -113,6 +113,7 @@ void MultiJitterOperator::doOperation(vk::Device logicalDevice,
 
   // Ensure vpps is perfect square and a power of 2
   uint32_t root = static_cast<uint32_t>(std::sqrt(vpps));
+
   assert(root * root == vpps && vpps != 0); //&& (vpps & (vpps - 1)) == 0);
 
   float stride_major = 1.f; // / (float)range.x;
@@ -147,7 +148,7 @@ void MultiJitterOperator::doOperation(vk::Device logicalDevice,
   //        glm::vec4(1.0f, 1.0f, 1.0f, 0.0f);
   //  }
   //}
-  
+
   float fov_rad = glm::radians(60.f);
   float aspect = float(range.x) / float(range.y);
   float tanHalfFov = tan(fov_rad * 0.5f);
@@ -192,6 +193,7 @@ void MultiJitterOperator::doOperation(vk::Device logicalDevice,
       out.init_wo = out.wo;
     }
   }
+
   uploadToVRAM(logicalDevice, cmdPool, queue, allocator, buffer,
                size * sizeof(Tracer::hitData), pHitData.data());
 }
