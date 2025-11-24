@@ -39,7 +39,7 @@ void VulkanRender::init() {
 
   initializeScene();
 
-  execScene(0);
+  execScene(1);
 
   createUniformBuffers();
 
@@ -155,12 +155,16 @@ void VulkanRender::createImageResources() {
   createInfo.samples = vk::SampleCountFlagBits::e1;
   createInfo.tiling = vk::ImageTiling::eOptimal;
   createInfo.sharingMode = vk::SharingMode::eExclusive;
-  createInfo.pQueueFamilyIndices = qFamilies.data();
-  createInfo.queueFamilyIndexCount = qFamilies.size();
+  createInfo.pQueueFamilyIndices = nullptr;
+  createInfo.queueFamilyIndexCount = 0;
   createInfo.usage = vk::ImageUsageFlagBits::eStorage |
                      vk::ImageUsageFlagBits::eSampled |
-                     vk::ImageUsageFlagBits::eColorAttachment;
+                     vk::ImageUsageFlagBits::eTransferSrc |
+                     vk::ImageUsageFlagBits::eTransferDst;
   createInfo.initialLayout = vk::ImageLayout::eUndefined;
+
+  compute.computeImg.createImage(logicalDevice, allocator, createInfo);
+  compute.computeImg.createView(vk::ImageAspectFlagBits::eColor);
 
   vk::CommandBufferAllocateInfo allocInfo{};
   allocInfo.sType = vk::StructureType::eCommandBufferAllocateInfo;
@@ -177,14 +181,9 @@ void VulkanRender::createImageResources() {
 
   commandBuffer.begin(beginInfo);
 
-  compute.computeImg.createImage(logicalDevice, allocator, createInfo);
-  compute.computeImg.createView(vk::ImageAspectFlagBits::eColor);
-  compute.computeImg.transitionLayout(
-      commandBuffer, {graphics.queueIDX, graphics.queueIDX},
-      vk::ImageLayout::eUndefined, vk::ImageLayout::eGeneral,
-      vk::AccessFlagBits::eNone, vk::AccessFlagBits::eShaderWrite,
-      vk::PipelineStageFlagBits::eTopOfPipe,
-      vk::PipelineStageFlagBits::eComputeShader);
+  transitionImage(commandBuffer, compute.computeImg,
+                  vk::ImageLayout::eUndefined, vk::ImageLayout::eGeneral,
+                  vk::ImageAspectFlagBits::eColor);
 
   commandBuffer.end();
 
@@ -328,7 +327,7 @@ void VulkanRender::drawFrame() {
   ImGui_ImplGlfw_NewFrame();
   ImGui::NewFrame();
   showPerformanceMenu();
-  showMenu();
+  // showMenu();
 
   if (*cameraMoved) {
     Logger::log(Logger::LogLevel::DEBUG, "Camera moved need reset");
@@ -374,8 +373,7 @@ void VulkanRender::drawFrame() {
     std::ostringstream oss;
     oss << std::put_time(&local_tm, "%Y-%m-%d %H:%M:%S");
 
-    // Logger::log(Logger::LogLevel::DEBUG, "Compute done at: " +
-    // oss.str());
+    Logger::log(Logger::LogLevel::DEBUG, "Compute done at: " + oss.str());
   }
 
   // logicalDevice.waitForFences(1,&compute.computeFence,1, UINT64_MAX);
@@ -462,8 +460,7 @@ void VulkanRender::transitionImage(vk::CommandBuffer cmd, vk::Image image,
       newLayout == vk::ImageLayout::eGeneral) {
 
     barrier.srcAccessMask = {};
-    barrier.dstAccessMask =
-        vk::AccessFlagBits::eShaderWrite | vk::AccessFlagBits::eShaderRead;
+    barrier.dstAccessMask = vk::AccessFlagBits::eShaderWrite;
 
     srcStage = vk::PipelineStageFlagBits::eTopOfPipe;
     dstStage = vk::PipelineStageFlagBits::eComputeShader;
@@ -565,12 +562,12 @@ void VulkanRender::recordComputeCommandBuffer(vk::CommandBuffer cmdBuffer) {
   cmdBuffer.begin(&beginInfo);
 
   if (compute.computeImg.currentLayout_ == vk::ImageLayout::eUndefined) {
-    transitionImage(compute.commandBuffer, compute.computeImg,
+    transitionImage(cmdBuffer, compute.computeImg,
                     compute.computeImg.currentLayout_,
                     vk::ImageLayout::eGeneral, vk::ImageAspectFlagBits::eColor);
   } else if (compute.computeImg.currentLayout_ ==
              vk::ImageLayout::eShaderReadOnlyOptimal) {
-    transitionImage(compute.commandBuffer, compute.computeImg,
+    transitionImage(cmdBuffer, compute.computeImg,
                     compute.computeImg.currentLayout_,
                     vk::ImageLayout::eGeneral, vk::ImageAspectFlagBits::eColor);
   }
@@ -586,9 +583,9 @@ void VulkanRender::recordComputeCommandBuffer(vk::CommandBuffer cmdBuffer) {
   cmdBuffer.dispatch((chain.extent.width + 15) / 16,
                      (chain.extent.height + 15) / 16, 1);
 
-  transitionImage(
-      compute.commandBuffer, compute.computeImg, vk::ImageLayout::eGeneral,
-      vk::ImageLayout::eShaderReadOnlyOptimal, vk::ImageAspectFlagBits::eColor);
+  transitionImage(cmdBuffer, compute.computeImg, vk::ImageLayout::eGeneral,
+                  vk::ImageLayout::eShaderReadOnlyOptimal,
+                  vk::ImageAspectFlagBits::eColor);
 
   compute.commandBuffer.end();
 }
@@ -1410,8 +1407,8 @@ void VulkanRender::recordGraphicCommandBuffer(vk::CommandBuffer commandBuffer,
                     vk::ImageAspectFlagBits::eColor);
   }
 
-  else if(chain.frames[imageIndex].layout == vk::ImageLayout::eUndefined) {
-      transitionImage(commandBuffer, chain.frames[imageIndex],
+  else if (chain.frames[imageIndex].layout == vk::ImageLayout::eUndefined) {
+    transitionImage(commandBuffer, chain.frames[imageIndex],
                     vk::ImageLayout::eUndefined,
                     vk::ImageLayout::eColorAttachmentOptimal,
                     vk::ImageAspectFlagBits::eColor);
@@ -1449,6 +1446,15 @@ void VulkanRender::recordGraphicCommandBuffer(vk::CommandBuffer commandBuffer,
   scissor.extent = chain.extent;
   commandBuffer.setScissor(0, 1, &scissor);
 
+  commandBuffer.bindPipeline(vk::PipelineBindPoint::eGraphics,
+                             graphics.pipeline.pipeline);
+
+  commandBuffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
+                                   graphics.pipeline.layout, 0, 1,
+                                   &general.descriptorSet, 0, nullptr);
+
+  commandBuffer.draw(3, 1, 0, 0);
+
   ImGui::Render();
   ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(),
                                   static_cast<VkCommandBuffer>(commandBuffer));
@@ -1460,15 +1466,7 @@ void VulkanRender::recordGraphicCommandBuffer(vk::CommandBuffer commandBuffer,
                   vk::ImageLayout::ePresentSrcKHR,
                   vk::ImageAspectFlagBits::eColor);
 
-  // transitionImage(commandBuffer, compute.computeImg,
-  //                 vk::ImageLayout::eShaderReadOnlyOptimal,
-  //                 vk::ImageLayout::eGeneral,
-  //                 vk::ImageAspectFlagBits::eColor);
-
-  auto resEnd = commandBuffer.end();
-  if (resEnd != vk::Result::eSuccess) {
-    throw std::runtime_error("Failed to end command buffer");
-  }
+  commandBuffer.end();
 }
 
 void VulkanRender::createSyncObjects() {
@@ -1626,7 +1624,7 @@ void VulkanRender::createSamplers() {
 void VulkanRender::createPipeline() {
 
   compute.pipeline.createPipeline(
-      logicalDevice, "pathTracer.comp.spv", general.descriptorSetLayout,
+      logicalDevice, "pathTracerDebug.comp.spv", general.descriptorSetLayout,
       compute.pushConstantsRange, deviceGlobalGarbageQueue);
 
   graphics.pipeline.createPipeline(

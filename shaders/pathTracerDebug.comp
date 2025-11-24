@@ -547,11 +547,11 @@ void main() {
 
 	if(constants.cameraMoved){
 		resetCamera(hd_index,index);
-		return;
+		//return;
 	}
 
 	if(pixel_data[index].radiance_currentRay.w >= constants.rpp){
-		return;
+		//return;
 	}
 
 	//if(currentHitData.throughput_depth.w == 0){
@@ -657,3 +657,4 @@ void main() {
   //  imageStore(StorageImage, pos,color);
 
 }
+

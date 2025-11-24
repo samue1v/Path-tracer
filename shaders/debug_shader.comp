@@ -1,0 +1,112 @@
+#version 450
+
+layout(local_size_x = 16, local_size_y = 16) in;
+
+struct HitData {
+  vec4 wo;
+  vec4 hit;
+  vec4 throughput_depth;
+  vec4 init_wo;
+};
+
+struct PRNG32 {
+    uvec4 state;
+};
+
+struct PixelData{
+	vec4 radiance_currentRay;
+};
+
+
+struct Material{
+ vec4 albedo_refractiveIdx;
+ vec4 emissive_reflectiveIdx;
+ vec4 type_pad3;
+};
+
+struct Sphere{
+    vec4 center_radius;
+	Material mat;
+};
+
+struct Plane{
+  vec4 center;
+  vec4 edge1;
+  vec4 edge2;
+  vec4 uv_pad2;
+  Material mat;
+};
+
+
+// GPU Struct definition
+
+struct Sample{
+	vec3 dir;
+	float pdf;
+};
+
+struct Fresnel{
+	vec3 wi;
+	vec3 throughput;
+	bool TIR;
+};
+
+// Bindings ----------------------------------------------------
+
+layout(set=0,binding = 0) uniform Camera {
+  mat4 view;
+  mat4 invView;
+  vec4 pos;
+} camera;
+
+
+layout(std430, set = 0, binding = 1) buffer HitDataBuffer {
+    HitData hit_data[];
+};
+
+layout(rgba8, set = 0, binding = 2) uniform image2D StorageImage;
+
+layout(std430, set = 0, binding = 3) buffer RNGBuffer{
+    PRNG32 prng32[];
+};
+
+
+layout(std430, set = 0, binding = 4) buffer SpheresBuffer{
+Sphere spheres[];
+};
+
+
+layout(std430, set = 0, binding = 5) buffer PlanesBuffer{
+    Plane planes[];
+};
+
+
+layout(std430, set = 0, binding = 6) buffer PixelDataBuffer{
+	PixelData pixel_data[];
+};
+
+layout(set = 0, binding = 7) uniform sampler2D uTexture;
+
+layout( push_constant ) uniform PushConstants{
+  mat4 m;
+  uint rpp;
+  uint max_rpp;
+  uint numSpheres;
+  uint numPlanes;
+  uint numLights;
+  uint pad0;
+  uint pad1;
+  uint pad2;
+  bool cameraMoved;
+} constants;
+
+
+void main() {
+    ivec2 pixelCoord = ivec2(gl_GlobalInvocationID.xy);
+    ivec2 imageSize = imageSize(StorageImage);
+    
+    vec2 uv = vec2(pixelCoord) / vec2(imageSize);
+    vec4 color = vec4(uv, 0.0, 1.0); // Simple gradient
+    
+    imageStore(StorageImage, pixelCoord, color);
+}

@@ -9,4 +9,7 @@ layout(set = 0, binding = 7) uniform sampler2D uTexture;
 
 void main() {
     outColor = texture(uTexture, vUV);
+    
+    //outColor = vec4(0.,1.,0.,1.);
+
 }
