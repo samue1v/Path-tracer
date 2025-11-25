@@ -39,7 +39,7 @@ void VulkanRender::init() {
 
   initializeScene();
 
-  execScene(1);
+  execScene(0);
 
   createUniformBuffers();
 
@@ -295,7 +295,7 @@ void VulkanRender::updateShaderData(vk::CommandBuffer cmdBuffer) {
   compute.constants.numSpheres = compute.spheres.size();
   compute.constants.numLights = 0;
   compute.constants.rpp = compute.rays_per_pixel;
-  compute.constants.camera_move = *cameraMoved;
+  compute.constants.camera_move = (uint32_t)*cameraMoved;
   compute.constants.max_rpp = compute.MAX_RAYS_PER_PIXEL;
 
   int ri = readIndex->load(std::memory_order_relaxed);
@@ -362,6 +362,7 @@ void VulkanRender::drawFrame() {
   submitInfoCompute.pSignalSemaphores = &compute.computeFinishedSemaphore;
 
   compute.queue.submit(1, &submitInfoCompute, nullptr);
+
 
   if (enableValidationLayers) {
     auto now = std::chrono::system_clock::now();
@@ -1624,7 +1625,7 @@ void VulkanRender::createSamplers() {
 void VulkanRender::createPipeline() {
 
   compute.pipeline.createPipeline(
-      logicalDevice, "pathTracerDebug.comp.spv", general.descriptorSetLayout,
+      logicalDevice, "pathTracer.comp.spv", general.descriptorSetLayout,
       compute.pushConstantsRange, deviceGlobalGarbageQueue);
 
   graphics.pipeline.createPipeline(

@@ -57,8 +57,7 @@ struct alignas(16) PushConstants {
   uint32_t numLights;
   uint32_t pad0;
   uint32_t pad1;
-  uint32_t pad2;
-  bool camera_move;
+  uint32_t camera_move;
 };
 
 }; // namespace Tracer

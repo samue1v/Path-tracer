@@ -131,8 +131,7 @@ layout( push_constant ) uniform PushConstants{
   uint numLights;
   uint pad0;
   uint pad1;
-  uint pad2;
-  bool cameraMoved;
+  uint cameraMoved;
 } constants;
 
 // Functions ---------------------------------------------------
@@ -502,8 +501,7 @@ bool Trace(inout HitData hd, inout PRNG32 rng , out Material mat , out vec3 hit_
 	return true;
 }
 
-
-void resetCamera(in uint hd_index, in uint idx ){
+void resetCamera(in uint idx ){
 	PixelData pd = pixel_data[idx];
 	uint f = idx*constants.max_rpp;
 
@@ -542,16 +540,20 @@ void main() {
 	
 	// Acquired Data
 	HitData currentHitData =  hit_data[hd_index];
-	PixelData currentPixelData = pixel_data[index];
     PRNG32 rng = prng32[index];
 
-	if(constants.cameraMoved){
-		resetCamera(hd_index,index);
-		//return;
+	if(bool(constants.cameraMoved)){
+	//	resetCamera(hd_index,index);
+
+		resetCamera(index);
+		//imageStore(StorageImage, ivec2(gid), vec4(1,1,0,1));
+		return;
 	}
 
+	PixelData currentPixelData = pixel_data[index];
 	if(pixel_data[index].radiance_currentRay.w >= constants.rpp){
-		//return;
+	    //imageStore(StorageImage, ivec2(gid), vec4(1,1,1,1)); // amarelo = erro
+		return;
 	}
 
 	//if(currentHitData.throughput_depth.w == 0){
@@ -614,11 +616,10 @@ void main() {
 
 	// Store image
     color = vec4(gammaCorrect(currentPixelData.radiance_currentRay.xyz),0.0);
-    //imageStore(StorageImage, pos,color);
+    imageStore(StorageImage, pos,color);
 
-    //imageStore(StorageImage, pos,vec4(1.,0.,0.,0.));
-    vec4 test_color = vec4(1.0,0.0,0.0,1.0);
-    imageStore(StorageImage, pos, test_color);
+    //vec4 test_color = vec4(1.0,0.0,0.0,1.0);
+    //imageStore(StorageImage, pos, test_color);
 
 
 	//// Apply filter

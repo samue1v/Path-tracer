@@ -131,8 +131,7 @@ layout( push_constant ) uniform PushConstants{
   uint numLights;
   uint pad0;
   uint pad1;
-  uint pad2;
-  bool cameraMoved;
+  uint cameraMoved;
 } constants;
 
 // Functions ---------------------------------------------------
@@ -503,7 +502,7 @@ bool Trace(inout HitData hd, inout PRNG32 rng , out Material mat , out vec3 hit_
 }
 
 
-void resetCamera(in uint hd_index, in uint idx ){
+void resetCamera( in uint idx ){
 	PixelData pd = pixel_data[idx];
 	uint f = idx*constants.max_rpp;
 
@@ -545,8 +544,8 @@ void main() {
 	PixelData currentPixelData = pixel_data[index];
     PRNG32 rng = prng32[index];
 
-	if(constants.cameraMoved){
-		resetCamera(hd_index,index);
+	if(bool(constants.cameraMoved)){
+		resetCamera(index);
 		return;
 	}
 
@@ -614,11 +613,8 @@ void main() {
 
 	// Store image
     color = vec4(gammaCorrect(currentPixelData.radiance_currentRay.xyz),0.0);
-    //imageStore(StorageImage, pos,color);
+    imageStore(StorageImage, pos,color);
 
-    //imageStore(StorageImage, pos,vec4(1.,0.,0.,0.));
-    vec4 test_color = vec4(1.0,0.0,0.0,1.0);
-    imageStore(StorageImage, pos, test_color);
 
 
 	//// Apply filter

@@ -42,7 +42,7 @@ void spawn_render_thread(GLFWwindow *window, VulkanRender *engine,
   delete engine;
 }
 App::App(GLFWwindow *window)
-    : window(window), logger(Logger::getInstance()),
+    : window(window), logger(Logger::getInstance()), mouseDragging(false),
       camera_buffer({{glm::mat4(1.f), glm::mat4(1.f), {0.f, 0.f, 4.f, 1.f}},
                      {glm::mat4(1.f), glm::mat4(1.f), {0.f, 0.f, 4.f, 1.f}}}),
       readIndex(0), writeIndex(1), cameraMoved(false),
